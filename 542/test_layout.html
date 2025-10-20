@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>布局优化测试页面</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0f4c81',
+                        secondary: '#3a7ca5',
+                        accent: '#d9dcd6',
+                        warning: '#e74c3c',
+                        success: '#2ecc71',
+                        dark: '#1a365d',
+                        light: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-warning': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .grid-dashboard {
+                grid-template-columns: 280px 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+            .chart-container {
+                position: relative;
+                height: 100%;
+                width: 100%;
+            }
+            .alert-pulse {
+                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            @keyframes pulse {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.5;
+                }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased text-gray-900">
+    <div class="min-h-screen flex flex-col">
+        <!-- 顶部导航栏 -->
+        <header class="bg-primary text-white shadow-md">
+            <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fa fa-microchip text-2xl"></i>
+                    <h1 class="text-xl font-bold">芯片数据实时接收系统 - 布局优化测试</h1>
+                </div>
+                <div class="flex flex-wrap items-center justify-end gap-4">
+                    <div class="flex items-center space-x-2">
+                        <span id="connection-status" class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+                        <span id="connection-text">已连接</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span id="monitor-status" class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+                        <span id="monitor-text">监控中</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <i class="fa fa-refresh"></i>
+                        <span id="data-rate">20</span> <span class="text-sm">数据点/秒</span>
+                    </div>
+                    <button id="monitor-toggle" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded-md text-sm flex items-center">
+                        <i class="fa fa-pause mr-1"></i> 关闭监控
+                    </button>
+                    <button id="settings-btn" class="bg-secondary hover:bg-blue-700 px-3 py-1 rounded-md text-sm flex items-center">
+                        <i class="fa fa-cog mr-1"></i> 设置
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="flex-grow flex flex-col md:flex-row">
+            <!-- 左侧面板 -->
+            <aside class="w-full md:w-72 bg-white shadow-md md:min-h-screen p-4">
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa fa-plug mr-2 text-primary"></i>设备连接
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="bg-green-50 border border-green-200 rounded-md p-3 flex items-center">
+                            <div class="flex items-center">
+                                <i class="fa fa-usb text-green-500 mr-2"></i>
+                                <div>
+                                    <p class="font-medium">传感设备</p>
+                                    <p class="text-xs text-gray-500">COM3 • 115200 bps</p>
+                                </div>
+                            </div>
+                            <button class="ml-auto text-sm text-primary hover:text-primary-dark">已连接</button>
+                        </div>
+                        <div class="bg-green-50 border border-green-200 rounded-md p-3 flex items-center">
+                            <div class="flex items-center">
+                                <i class="fa fa-wifi text-green-500 mr-2"></i>
+                                <div>
+                                    <p class="font-medium">网络设备</p>
+                                    <p class="text-xs text-gray-500">COM3 • 114514 bps</p>
+                                </div>
+                            </div>
+                            <button class="ml-auto text-sm text-primary hover:text-primary-dark">已连接</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa fa-sliders mr-2 text-primary"></i>数据参数
+                    </h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">数据类型</label>
+                            <select id="data-type" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="temperature">温度 (°C)</option>
+                                <option value="voltage">压力值 (G)</option>
+                                <option value="current">震动程度 (Z)</option>
+                                <option value="custom">自定义数据</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">采样频率</label>
+                            <select id="sample-rate" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="1">1 Hz</option>
+                                <option value="5" selected="">5 Hz</option>
+                                <option value="10">10 Hz</option>
+                                <option value="50">50 Hz</option>
+                                <option value="100">100 Hz</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa fa-history mr-2 text-primary"></i>历史记录
+                    </h2>
+                    <div class="space-y-2">
+                        <button id="clear-data" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded-md text-sm flex items-center justify-center">
+                            <i class="fa fa-trash mr-1"></i> 清除数据
+                        </button>
+                        <button id="export-csv" class="w-full bg-primary hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm flex items-center justify-center">
+                            <i class="fa fa-download mr-1"></i> 导出 CSV
+                        </button>
+                        <button id="export-json" class="w-full bg-secondary hover:bg-blue-600 text-white py-2 px-4 rounded-md text-sm flex items-center justify-center">
+                            <i class="fa fa-download mr-1"></i> 导出 JSON
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 右侧内容区 -->
+            <div class="flex-grow p-4 md:p-6 overflow-auto space-y-6">
+                <!-- 主图表卡片 -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold flex items-center">
+                            <i class="fa fa-line-chart mr-2 text-primary"></i>
+                            <span id="chart-title">温度 (°C)实时监控</span>
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button id="pause-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded-md text-sm flex items-center">
+                                <i class="fa fa-pause mr-1"></i> 暂停
+                            </button>
+                            <button id="zoom-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded-md text-sm flex items-center">
+                                <i class="fa fa-search-plus mr-1"></i> 缩放
+                            </button>
+                        </div>
+                    </div>
+                    <div class="h-80">
+                        <canvas id="data-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 仪表盘卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center">
+                            <i class="fa fa-thermometer-half mr-2 text-primary"></i>温度
+                        </h3>
+                        <div class="flex items-center justify-center h-40">
+                            <div class="relative w-32 h-32">
+                                <canvas id="temperature-gauge"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <div class="flex items-baseline">
+                                        <span id="temperature-value" class="text-3xl font-bold">25.4</span>
+                                        <span class="text-sm text-gray-500 ml-1">°C</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center">
+                            <i class="fa fa-bolt mr-2 text-primary"></i>压力值
+                        </h3>
+                        <div class="flex items-center justify-center h-40">
+                            <div class="relative w-32 h-32">
+                                <canvas id="voltage-gauge"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span id="voltage-value" class="text-3xl font-bold">3.32</span>
+                                    <span class="text-sm text-gray-500">G</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center">
+                            <i class="fa fa-battery-three-quarters mr-2 text-primary"></i>震动程度
+                        </h3>
+                        <div class="flex items-center justify-center h-40">
+                            <div class="relative w-32 h-32">
+                                <canvas id="current-gauge"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span id="current-value" class="text-3xl font-bold">150.8</span>
+                                    <span class="text-sm text-gray-500">Z</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 数据日志卡片 -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-table mr-2 text-primary"></i>数据日志
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <div class="max-h-60 overflow-y-auto scrollbar-hide">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50 sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">温度 (°C)</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">压力值 (g)</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">震动程度 (Z)</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="data-log" class="bg-white divide-y divide-gray-200">
+                                    <!-- 数据行将通过JavaScript动态添加 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 建筑稳定性监控面板 -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold flex items-center">
+                            <i class="fa fa-building-o mr-2 text-primary"></i>建筑稳定性监控
+                        </h2>
+                        <div class="flex space-x-2">
+                            <div class="flex items-center space-x-2">
+                                <span id="stability-monitor-status" class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+                                <span id="stability-monitor-text">监控中</span>
+                            </div>
+                            <button id="stability-monitor-toggle" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded-md text-sm flex items-center">
+                                <i class="fa fa-pause mr-1"></i> 关闭监控
+                            </button>
+                            <button id="run-stability-check" class="bg-primary hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm flex items-center">
+                                <i class="fa fa-refresh mr-1"></i> 运行检测
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        <!-- 稳定性评分 -->
+                        <div class="col-span-1">
+                            <div class="bg-gray-50 p-4 rounded-md h-full flex flex-col">
+                                <h3 class="text-lg font-medium text-gray-700 mb-3 text-center">稳定性评分</h3>
+                                <div class="flex-grow flex items-center justify-center">
+                                    <div class="relative w-32 h-32">
+                                        <canvas id="stability-gauge"></canvas>
+                                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                            <span id="stability-value" class="text-3xl font-bold">95</span>
+                                            <span class="text-sm text-gray-500">/100</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3 text-center">
+                                    <span id="stability-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>正常
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 关键指标 -->
+                        <div class="col-span-1 lg:col-span-3">
+                            <div class="bg-gray-50 p-4 rounded-md h-full">
+                                <h3 class="text-lg font-medium text-gray-700 mb-3">关键指标</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <!-- 振动强度 -->
+                                    <div class="bg-white p-3 rounded-md shadow-sm">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-sm font-medium text-gray-700">振动强度</span>
+                                            <span id="vibration-value" class="text-sm font-medium">0.02 g</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div id="vibration-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 20%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                            <span>0 g</span>
+                                            <span>0.1 g</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 位移 -->
+                                    <div class="bg-white p-3 rounded-md shadow-sm">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-sm font-medium text-gray-700">位移</span>
+                                            <span id="displacement-value" class="text-sm font-medium">0.1 mm</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div id="displacementment-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 10%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                            <span>0 mm</span>
+                                            <span>1.0 mm</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 倾斜角度 -->
+                                    <div class="bg-white p-3 rounded-md shadow-sm">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-sm font-medium text-gray-700">倾斜角度</span>
+                                            <span id="tilt-value" class="text-sm font-medium">0.5°</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div id="tilt-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 10%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                            <span>0°</span>
+                                            <span>5.0°</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 历史趋势 -->
+                    <div class="mt-6">
+                        <h3 class="text-lg font-medium text-gray-700 mb-3">稳定性趋势</h3>
+                        <div class="h-64 bg-white p-4 rounded-md shadow-sm">
+                            <canvas id="stability-trend-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部状态栏 -->
+        <footer class="bg-dark text-white py-2 px-4">
+            <div class="container mx-auto flex flex-col md:flex-row justify-between items-center">
+                <div class="text-sm mb-2 md:mb-0">
+                    <span id="total-data-points">0</span> 个数据点已接收 • 最后更新: <span id="last-update">--:--:--</span>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                        <span class="text-xs">正常</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
+                        <span class="text-xs">警告</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+                        <span class="text-xs">异常</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 初始化图表
+        document.addEventListener('DOMContentLoaded', function() {
+            // 主数据图表
+            const ctx = document.getElementById('data-chart').getContext('2d');
+            const dataChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 50}, (_, i) => `${i}`),
+                    datasets: [{
+                        label: '温度 (°C)',
+                        data: Array.from({length: 50}, () => Math.random() * 20 + 20),
+                        borderColor: '#0f4c81',
+                        backgroundColor: 'rgba(15, 76, 129, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '时间'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '温度 (°C)'
+                            },
+                            suggestedMin: 20,
+                            suggestedMax: 40
+                        }
+                    }
+                }
+            });
+
+            // 温度仪表盘
+            const tempCtx = document.getElementById('temperature-gauge').getContext('2d');
+            const temperatureGauge = new Chart(tempCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [25, 75],
+                        backgroundColor: [
+                            '#3a7ca5',
+                            '#e9ecef'
+                        ],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // 压力值表盘
+            const voltageCtx = document.getElementById('voltage-gauge').getContext('2d');
+            const voltageGauge = new Chart(voltageCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [3.32, 6.68],
+                        backgroundColor: [
+                            '#2ecc71',
+                            '#e9ecef'
+                        ],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // 震动程度表盘
+            const currentCtx = document.getElementById('current-gauge').getContext('2d');
+            const currentGauge = new Chart(currentCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [150.8, 349.2],
+                        backgroundColor: [
+                            '#f39c12',
+                            '#e9ecef'
+                        ],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // 稳定性评分仪表盘
+            const stabilityCtx = document.getElementById('stability-gauge').getContext('2d');
+            const stabilityGauge = new Chart(stabilityCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [95, 5],
+                        backgroundColor: [
+                            '#2ecc71',
+                            '#e9ecef'
+                        ],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // 稳定性趋势图表
+            const trendCtx = document.getElementById('stability-trend-chart').getContext('2d');
+            const stabilityTrendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: '稳定性评分',
+                        data: Array.from({length: 24}, () => Math.random() * 10 + 90),
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '时间'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '评分'
+                            },
+                            suggestedMin: 80,
+                            suggestedMax: 100
+                        }
+                    }
+                }
+            });
+
+            // 填充数据日志
+            const dataLog = document.getElementById('data-log');
+            const now = new Date();
+            
+            for (let i = 0; i < 20; i++) {
+                const time = new Date(now - i * 1000).toLocaleTimeString();
+                const temperature = (Math.random() * 10 + 20).toFixed(1);
+                const voltage = (Math.random() * 0.4 + 3.0).toFixed(2);
+                const current = (Math.random() * 40 + 130).toFixed(1);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${time}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${temperature}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${voltage}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${current}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
+                            <span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                            正常
+                        </span>
+                    </td>
+                `;
+                
+                dataLog.appendChild(row);
+            }
+        });
+    </script>
+</body>
+</html>

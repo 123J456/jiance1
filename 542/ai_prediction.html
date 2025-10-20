@@ -1,0 +1,2381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>芯片数据实时接收系统</title>
+    <!-- Tailwind CSS -->
+    <script src="https://://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#8b5cf6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        info: '#6b7280',
+                        light: '#f8fafc',
+                        dark: '#1e293b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .clip-path-polygon {
+                clip-path: polygon(
+                    0%, 
+                    95%, 
+                    100%, 
+                    100%, 
+                    5%, 
+                    0%
+                );
+            }
+            .border-l-highlight {
+                border-left-width: 4px;
+            }
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+        }
+    </style>
+    <style>
+        :root {
+            --color-up: #10b981; /* 绿色：上升趋势 */
+            --color-down: #ef4444; /* 红色：下降趋势 */
+            --color-neutral: #6b7280; /* 灰色：持平状态 */
+            --color-primary: #3b82f6; /* 蓝色：主要强调 */
+            --color-secondary: #8b5cf6; /* 紫色：次要强调 */
+            --color-warning: #f59e0b; /* 橙色：警告状态 */
+        }
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .card {
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+        }
+        
+        .gauge-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .gauge-label {
+            position: absolute;
+            bottom: 20%;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        /* 背景动画 */
+        #animationBackground {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* 数据表格样式 */
+        .data-table th {
+            font-weight: 500;
+            color: #64748b;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .data-table tr:hover {
+            background-color: #f8fafc;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            display: inline-flex;
+            align-items-center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        
+        .btn-outline {
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+        }
+        
+        .btn-outline:hover {
+            background-color: #f1f5f9;
+        }
+        
+        /* 状态指示器 */
+        .status-indicator {
+            display: inline-block;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-online {
+            background-color: var(--color-up);
+        }
+        
+        .status-offline {
+            background-color: var(--color-down);
+        }
+        
+        .status-warning {
+            background-color: var(--color-warning);
+        }
+        
+        /* 折线装饰 */
+        .zigzag-line {
+            position: relative;
+            height: 1px;
+            background: linear-gradient(135deg, #e2e8f0 25%, transparent 25%) -10px 0,
+                        linear-gradient(225deg, #e2e8f0 25%, transparent 25%) -10px 0,
+                        linear-gradient(315deg, #e2e8f0 25%, transparent 25%),
+                        linear-gradient(45deg, #e2e8f0 25%, transparent 25%);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 背景动画 -->
+    <canvas id="animationBackground"></canvas>
+
+    <!-- 顶部导航栏 -->
+    <header class="bg-white border-b border-gray-200 shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="w-8 h-8 mr-3">
+                    <svg viewBox="0 0 24 24" class="text-primary w-full h-full">
+                        <polyline points="3,12 8,7 12,11 16,7 21,12" fill="none" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">芯片数据实时接收系统</h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <!-- 连接状态 -->
+                <div class="flex items-center">
+                    <span id="connection-status" class="status-indicator status-online"></span>
+                    <span id="connection-text" class="text-sm text-gray-700">已连接</span>
+                </div>
+                
+                <!-- 监控状态 -->
+                <div class="flex items-center">
+                    <span id="monitor-status" class="status-indicator status-online"></span>
+                    <span id="monitor-text" class="text-sm text-gray-700">监控中</span>
+                </div>
+                
+                <!-- 数据速率 -->
+                <div class="flex items-center">
+                    <i class="fa fa-refresh text-gray-500 mr-1"></i>
+                    <span id="data-rate" class="text-sm text-gray-700">20</span>
+                    <span class="text-xs text-gray-500 ml-1">数据点/秒</span>
+                </div>
+                
+                <!-- 监控开关 -->
+                <button id="monitor-toggle" class="btn btn-primary">
+                    <i class="fa fa-pause mr-1"></i> 关闭监控
+                </button>
+                
+                <!-- 预警系统 -->
+                <button id="alert-btn" class="btn btn-outline">
+                    <i class="fa fa-bell mr-1"></i> 预警系统
+                </button>
+                
+                <!-- 设置按钮 -->
+                <button id="settings-btn" class="btn btn-outline">
+                    <i class="fa fa-cog mr-1"></i> 设置
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- 顶部卡片区域 -->
+        <div class="grid grid-cols-12 gap-4 mb-6">
+            <!-- 跨越全部12列的头部组件 -->
+            <div class="col-span-12 bg-white p-4 shadow-sm border-l-4 border-primary">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-medium text-gray-800">系统概览</h2>
+                        <p class="text-sm text-gray-500">实时监控芯片数据接收与处理状态</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-500">最后更新: </span>
+                        <span id="last-update" class="text-sm font-medium">2023-07-21 15:30:45</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 数据监控卡片 -->
+        <div class="grid grid-cols-12 gap-4 mb-6">
+            <!-- 4列宽的温度卡片 -->
+            <div class="col-span-4 card p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-medium text-gray-800">温度监控</h3>
+                    <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">正常</span>
+                </div>
+                <div class="gauge-container h-48">
+                    <canvas id="temperature-gauge"></canvas>
+                    <div class="gauge-value">
+                        <span id="temperature-value">25.6</span>
+                        <span class="text-lg">°C</span>
+                    </div>
+                </div>
+                <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <p class="text-xs text-gray-500">最大值</p>
+                        <p id="temperature-max" class="text-sm font-medium">28.3</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">最小值</p>
+                        <p id="temperature-min" class="text-sm font-medium">22.1</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">平均值</p>
+                        <p id="temperature-avg" class="text-sm font-medium">24.8</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 4列宽的压力值卡片 -->
+            <div class="col-span-4 card p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-medium text-gray-800">压力值监控</h3>
+                    <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">正常</span>
+                </div>
+                <div class="gauge-container h-48">
+                    <canvas id="voltage-gauge"></canvas>
+                    <div class="gauge-value">
+                        <span id="voltage-value">2.50</span>
+                        <span class="text-lg">G</span>
+                    </div>
+                </div>
+                <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <p class="text-xs text-gray-500">最大值</p>
+                        <p id="voltage-max" class="text-sm font-medium">2.85</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">最小值</p>
+                        <p id="voltage-min" class="text-sm font-medium">2.10</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">平均值</p>
+                        <p id="voltage-avg" class="text-sm font-medium">2.45</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 4列宽的震动程度卡片 -->
+            <div class="col-span-4 card p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-medium text-gray-800">震动程度监控</h3>
+                    <span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">注意</span>
+                </div>
+                <div class="gauge-container h-48">
+                    <canvas id="current-gauge"></canvas>
+                    <div class="gauge-value">
+                        <span id="current-value">45.2</span>
+                        <span class="text-lg">Z</span>
+                    </div>
+                </div>
+                <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <p class="text-xs text-gray-500">最大值</p>
+                        <p id="current-max" class="text-sm font-medium">48.7</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">最小值</p>
+                        <p id="current-min" class="text-sm font-medium">41.3</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">平均值</p>
+                        <p id="current-avg" class="text-sm font-medium">44.5</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 实时数据图表 -->
+        <div class="grid grid-cols-12 gap-4 mb-6">
+            <!-- 8列宽的主要图表 -->
+            <div class="col-span-8 card p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-800">实时数据监控</h3>
+                    <div class="flex space-x-2">
+                        <div class="relative inline-block text-left">
+                            <button id="dataTypeDropdown" class="btn btn-outline text-sm py-1">
+                                <span id="selectedDataType">温度</span>
+                                <i class="fa fa-chevron-down ml-1"></i>
+                            </button>
+                            <div id="dataTypeOptions" class="hidden absolute z-10 mt-1 w-32 bg-white shadow-lg border border-gray-200 rounded-md">
+                                <div class="py-1">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-type="temperature">温度 (°C)</a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-type="voltage">压力值 (G)</a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-type="current">震动程度 (Z)</a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-type="custom">自定义数据</a>
+                                 </div>
+                             </div>
+                        </div>
+                        <button id="pause-btn" class="btn btn-outline text-sm py-1">
+                            <i class="fa fa-pause mr-1"></i> 暂停
+                        </button>
+                        <button id="zoom-btn" class="btn btn-outline text-sm py-1">
+                            <i class="fa fa-search-plus mr-1"></i> 缩放
+                        </button>
+                    </div>
+                </div>
+                <div class="h-80">
+                    <canvas id="data-chart"></canvas>
+                </div>
+            </div>
+            
+            <!-- 4列宽的设备连接状态 -->
+            <div class="col-span-4 card p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center">
+                    <i class="fa fa-plug mr-2 text-primary"></i>设备连接
+                </h3>
+                <div class="space-y-3">
+                    <div class="bg-green-50 border border-green-200 rounded-md p-3 flex items-center">
+                        <div class="flex items-center">
+                            <i class="fa fa-usb text-green-500 mr-2"></i>
+                            <div>
+                                <p class="font-medium">传感设备</p>
+                                <p class="text-xs text-gray-500">COM3 • 115200 bps</p>
+                            </div>
+                        </div>
+                        <button class="ml-auto text-sm text-primary hover:text-primary-dark">连接</button>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-md p-3 flex items-center">
+                        <div class="flex items-center">
+                            <i class="fa fa-wifi text-green-500 mr-2"></i>
+                            <div>
+                                <p class="font-medium">网络设备</p>
+                                <p class="text-xs text-gray-500">已连接</p>
+                            </div>
+                        </div>
+                        <button class="ml-auto text-sm text-primary hover:text-primary-dark">连接</button>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center">
+                         <i class="fa fa-sliders mr-2 text-primary"></i>数据参数
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">采样频率</label>
+                            <select id="sample-rate" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="1">1 Hz</option>
+                                <option value="5" selected>5 Hz</option>
+                                <option value="10">10 Hz</option>
+                                <option value="50">50 Hz</option>
+                                <option value="100">100 Hz</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">数据显示范围</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="display-range" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" value="50" min="10" max="100">
+                                <span class="text-sm text-gray-500">数据点</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 建筑稳定性监控 -->
+        <div class="grid grid-cols-12 gap-4 mb-6">
+            <!-- 4列宽的稳定性评分 -->
+            <div class="col-span-4 card p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-3 text-center">稳定性评分</h3>
+                <div class="gauge-container h-48">
+                    <canvas id="stability-gauge"></canvas>
+                    <div class="gauge-value">
+                        <span id="stability-value">95</span>
+                        <span class="text-lg">/100</span>
+                    </div>
+                </div>
+                <div class="mt-3 text-center">
+                    <span id="stability-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>正常
+                    </span>
+                </div>
+            </div>
+            
+            <!-- 8列宽的关键指标 -->
+            <div class="col-span-8 card p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">关键指标</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 振动强度 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium text-gray-700">振动强度</span>
+                            <span id="vibration-value" class="text-sm font-medium">0.02 g</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="vibration-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 20%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0 g</span>
+                            <span>0.1 g</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 位移 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium text-gray-700">位移</span>
+                            <span id="displacement-value" class="text-sm font-medium">0.1 mm</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="displacement-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 10%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0 mm</span>
+                            <span>1.0 mm</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 倾斜角度 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium text-gray-700">倾斜角度</span>
+                            <span id="tilt-value" class="text-sm font-medium">0.5°</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="tilt-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 10%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0°</span>
+                            <span>5.0°</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h4 class="text-md font-medium text-gray-800 mb-2">稳定性历史趋势</h4>
+                    <div class="h-48">
+                        <canvas id="stability-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 数据日志 -->
+        <div class="grid grid-cols-12 gap-4 mb-6">
+            <!-- 跨越全部12列的数据日志 -->
+            <div class="col-span-12 card p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-800">数据日志</h3>
+                    <div class="flex space-x-2">
+                        <button id="export-csv" class="btn btn-outline text-sm py-1">
+                            <i class="fa fa-download mr-1"></i> 导出CSV
+                        </button>
+                        <button id="export-json" class="btn btn-outline text-sm py-1">
+                            <i class="fa fa-download mr-1"></i> 导出JSON
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full data-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>温度 (°C)</th>
+                                <th>压力值 (G)</th>
+                                <th>震动程度 (Z)</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-log">
+                            <!-- 数据日志将通过JavaScript动态添加 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex justify-between items-center">
+                    <div class="text-sm text-gray-500">
+                        显示 <span id="log-count">0</span> 条记录
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="clear-log" class="text-sm text-gray-500 hover:text-gray-700">
+                            <i class="fa fa-trash mr-1"></i> 清空日志
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 系统状态监控 -->
+        <div class="grid grid-cols-12 gap-4">
+            <!-- 6列宽的系统资源 -->
+            <div class="col-span-6 card p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">系统资源监控</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium text-gray-700">CPU 使用率</span>
+                            <span id="cpu-usage" class="text-sm font-medium">12%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="cpu-bar" class="bg-blue-500 h-2.5 rounded-full" style="width: 12%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium text-gray-700">内存使用</span>
+                            <span id="memory-usage" class="text-sm font-medium">45%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="memory-bar" class="bg-purple-500 h-2.5 rounded-full" style="width: 45%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h4 class="text-md font-medium text-gray-800 mb-2">系统资源历史</h4>
+                    <div class="h-48">
+                        <canvas id="system-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 6列宽的数据验证 -->
+            <div class="col-span-6 card p-4">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">数据正确性验证</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div class="flex items-center">
+                            <i class="fa fa-check-circle text-green-500 mr-2"></i>
+                            <span class="text-sm font-medium">温度数据验证</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">通过</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div class="flex items-center">
+                            <i class="fa fa-check-circle text-green-500 mr-2"></i>
+                            <span class="text-sm font-medium">压力值数据验证</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">通过</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <div class="flex items-center">
+                            <i class="fa fa-exclamation-circle text-yellow-500 mr-2"></i>
+                            <span class="text-sm font-medium">震动程度数据验证</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">需注意</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div class="flex items-center">
+                            <i class="fa fa-check-circle text-green-500 mr-2"></i>
+                            <span class="text-sm font-medium">功率数据一致性校验</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">通过</span>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h4 class="text-md font-medium text-gray-800 mb-2">数据质量评分</h4>
+                    <div class="flex items-center">
+                        <div class="w-full bg-gray-200 rounded-full h-4 mr-4">
+                            <div class="bg-blue-500 h-4 rounded-full" style="width: 92%"></div>
+                        </div>
+                        <span class="text-lg font-bold">92%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 预警系统面板 -->
+    <div id="alert-panel" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold flex items-center">
+                    <i class="fa fa-bell mr-2 text-warning"></i>
+                    预警系统
+                </h3>
+                <button id="close-alert-btn" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium">预警开关</h3>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="alert-toggle" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-warning"></div>
+                    </label>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gray-50 p-3 rounded-md">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">温度预警阈值 (°C)</h4>
+                        <div class="flex items-center">
+                            <input type="range" id="temperature-threshold" min="20" max="30" value="28" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="temperature-threshold-value" class="ml-2 w-10 text-center">28</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-md">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">压力值预警阈值 (G)</h4>
+                        <div class="flex items-center">
+                            <input type="range" id="voltage-threshold" min="0" max="5" step="0.1" value="3.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="voltage-threshold-value" class="ml-2 w-10 text-center">3.5</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-md">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">震动程度预警阈值 (Z)</h4>
+                        <div class="flex items-center">
+                            <input type="range" id="current-threshold" min="40" max="50" value="48" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="current-threshold-value" class="ml-2 w-10 text-center">48</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="text-lg font-medium mb-3">预警历史记录</h3>
+                <div class="bg-gray-50 rounded-md overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数值</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">阈值</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alert-history" class="bg-white divide-y divide-gray-200">
+                            <!-- 预警历史记录将通过JavaScript动态添加 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">应用设置</h3>
+                <button id="close-settings" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">语言</label>
+                    <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="zh-CN" selected>简体中文</option>
+                        <option value="en-US">English</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">主题</label>
+                    <select id="theme-select" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="light" selected>浅色主题</option>
+                        <option value="dark">深色主题</option>
+                        <option value="system">跟随系统</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">数据显示精度</label>
+                    <select id="precision-select" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="1" selected>1位小数</option>
+                        <option value="2">2位小数</option>
+                        <option value="0">整数</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium text-gray-700">启用警告提示</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="enable-alert" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium text-gray-700">启用建筑稳定性检测</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="enable-stability" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancel-settings" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    取消
+                </button>
+                <button id="save-settings" class="px-4 py-2 bg-primary border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-4 mt-6">
+        <div class="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="text-sm text-gray-500 mb-2 md:mb-0">
+                © 2023 芯片数据实时接收系统 | 版本 1.0.0
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                    <span class="text-xs">正常</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
+                    <span class="text-xs">警告</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+                    <span class="text-xs">异常</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // 全局变量
+        let dataChart, temperatureGauge, voltageGauge, currentGauge, stabilityGauge, stabilityChart, systemChart;
+        let dataPoints = [];
+        let dataInterval;
+        let isMonitoring = true;
+        let isPaused = false;
+        let currentDataType = 'temperature';
+        let alertHistory = [];
+        
+        // 温度警告范围
+        const warningMin = 22;
+        const warningMax = 28;
+        
+        // 初始化函数
+        function initialize() {
+            initializeCharts();
+            initializeEventListeners();
+            startDataSimulation();
+            updateLastUpdateTime();
+            setupBackgroundAnimation();
+        }
+        
+        // 初始化图表
+        function initializeCharts() {
+            // 温度仪表盘
+            const temperatureCtx = document.getElementById('temperature-gauge').getContext('2d');
+            temperatureGauge = new Chart(temperatureCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [25.6, 4.4],
+                        backgroundColor: ['#3b82f6', '#f1f5f9'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+            
+            // 压力值仪表盘
+            const voltageCtx = document.getElementById('voltage-gauge').getContext('2d');
+            voltageGauge = new Chart(voltageCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [2.5, 2.5],
+                        backgroundColor: ['#10b981', '#f1f5f9'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+            
+            // 震动程度仪表盘
+            const currentCtx = document.getElementById('current-gauge').getContext('2d');
+            currentGauge = new Chart(currentCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [45.2, 4.8],
+                        backgroundColor: ['#f59e0b', '#f1f5f9'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+            
+            // 稳定性评分仪表盘
+            const stabilityCtx = document.getElementById('stability-gauge').getContext('2d');
+            stabilityGauge = new Chart(stabilityCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [95, 5],
+                        backgroundColor: ['#10b981', '#f1f5f9'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+            
+            // 实时数据图表
+            const dataCtx = document.getElementById('data-chart').getContext('2d');
+            dataChart = new Chart(dataCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '温度 (°C)',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 稳定性历史趋势图表
+            const stabilityChartCtx = document.getElementById('stability-chart').getContext('2d');
+            stabilityChart = new Chart(stabilityChartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1分钟前', '45秒前', '30秒前', '15秒前', '现在'],
+                    datasets: [{
+                        label: '稳定性评分',
+                        data: [98, 97, 96, 95, 95],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            min: 90,
+                            max: 100,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 系统资源图表
+            const systemChartCtx = document.getElementById('system-chart').getContext('2d');
+            systemChart = new Chart(systemChartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1分钟前', '45秒前', '30秒前', '15秒前', '现在'],
+                    datasets: [
+                        {
+                            label: 'CPU 使用率',
+                            data: [10, 12, 11, 13, 12],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2
+                        },
+                        {
+                            label: '内存使用',
+                            data: [42, 43, 44, 45, 45],
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            // 监控开关
+            document.getElementById('monitor-toggle').addEventListener('click', function() {
+                if (isMonitoring) {
+                    stopDataSimulation();
+                    this.innerHTML = '<i class="fa fa-play mr-1"></i> 开启监控';
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-outline');
+                    document.getElementById('monitor-status').classList.remove('status-online');
+                    document.getElementById('monitor-status').classList.add('status-offline');
+                    document.getElementById('monitor-text').textContent = '已停止';
+                } else {
+                    startDataSimulation();
+                    this.innerHTML = '<i class="fa fa-pause mr-1"></i> 关闭监控';
+                    this.classList.remove('btn-outline');
+                    this.classList.add('btn-primary');
+                    document.getElementById('monitor-status').classList.remove('status-offline');
+                    document.getElementById('monitor-status').classList.add('status-online');
+                    document.getElementById('monitor-text').textContent = '监控中';
+                }
+                isMonitoring = !isMonitoring;
+            });
+            
+            // 暂停按钮
+            document.getElementById('pause-btn').addEventListener('click', function() {
+                if (isPaused) {
+                    dataChart.options.plugins.tooltip.enabled = true;
+                    this.innerHTML = '<i class="fa fa-pause mr-1"></i> 暂停';
+                } else {
+                    dataChart.options.plugins.tooltip.enabled = false;
+                    this.innerHTML = '<i class="fa fa-play mr-1"></i> 继续';
+                }
+                isPaused = !isPaused;
+            });
+            
+            // 缩放按钮
+            document.getElementById('zoom-btn').addEventListener('click', function() {
+                const isZoomed = dataChart.options.scales.x.min !== undefined;
+                
+                if (isZoomed) {
+                    // 重置缩放
+                    dataChart.options.scales.x.min = undefined;
+                    dataChart.options.scales.x.max = undefined;
+                    dataChart.options.scales.y.min = undefined;
+                    dataChart.options.scales.y.max = undefined;
+                    this.innerHTML = '<i class="fa fa-search-plus mr-1"></i> 缩放';
+                } else {
+                    // 应用缩放
+                    const data = dataChart.data.datasets[0].data;
+                    const min = Math.min(...data);
+                    const max = Math.max(...data);
+                    const range = max - min;
+                    
+                    dataChart.options.scales.y.min = min - range * 0.1;
+                    dataChart.options.scales.y.max = max + range * 0.1;
+                    this.innerHTML = '<i class="fa fa-search-minus mr-1"></i> 重置';
+                }
+                
+                dataChart.update();
+            });
+            
+            // 数据类型下拉菜单
+            document.getElementById('dataTypeDropdown').addEventListener('click', function() {
+                document.getElementById('dataTypeOptions').classList.toggle('hidden');
+            });
+            
+            // 点击其他区域关闭下拉菜单
+            document.addEventListener('click', function(event) {
+                const dropdown = document.getElementById('dataTypeDropdown');
+                const options = document.getElementById('dataTypeOptions');
+                
+                if (!dropdown.contains(event.target) && !options.contains(event.target)) {
+                    options.classList.add('hidden');
+                }
+            });
+            
+            // 数据类型选项
+            document.querySelectorAll('#dataTypeOptions a').forEach(option => {
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    currentDataType = this.getAttribute('data-type');
+                    document.getElementById('selectedDataType').textContent = this.textContent.split(' ')[0];
+                    document.getElementById('dataTypeOptions').classList.add('hidden');
+                    
+                    // 更新图表
+                    updateChartType();
+                });
+            });
+            
+            // 采样频率选择
+            document.getElementById('sample-rate').addEventListener('change', function() {
+                if (isMonitoring) {
+                    startDataSimulation();
+                }
+            });
+            
+            // 设置按钮
+            document.getElementById('settings-btn').addEventListener('click', function() {
+                document.getElementById('settings-modal').classList.remove('hidden');
+            });
+            
+            // 关闭设置模态框
+            document.getElementById('close-settings').addEventListener('click', function() {
+                document.getElementById('settings-modal').classList.add('hidden');
+            });
+            
+            document.getElementById('cancel-settings').addEventListener('click', function() {
+                document.getElementById('settings-modal').classList.add('hidden');
+            });
+            
+            // 保存设置
+            document.getElementById('save-settings').addEventListener('click', function() {
+                // 保存设置逻辑
+                document.getElementById('settings-modal').classList.add('hidden');
+                
+                // 显示保存成功提示
+                showNotification('设置已保存', 'success');
+            });
+            
+            // 导出CSV
+            document.getElementById('export-csv').addEventListener('click', function() {
+                exportData('csv');
+            });
+            
+            // 导出JSON
+            document.getElementById('export-json').addEventListener('click', function() {
+                exportData('json');
+            });
+            
+            // 清空日志
+            document.getElementById('clear-log').addEventListener('click', function() {
+                if (confirm('确定要清空数据日志吗？')) {
+                    dataPoints = [];
+                    document.getElementById('data-log').innerHTML = '';
+                    document.getElementById('log-count').textContent = '0';
+                }
+            });
+            
+            // 预警系统按钮
+            document.getElementById('alert-btn').addEventListener('click', function() {
+                document.getElementById('alert-panel').classList.toggle('hidden');
+            });
+            
+            // 关闭预警系统面板
+            document.getElementById('close-alert-btn').addEventListener('click', function() {
+                document.getElementById('alert-panel').classList.add('hidden');
+            });
+            
+            // 预警阈值滑块
+            document.getElementById('temperature-threshold').addEventListener('input', function() {
+                document.getElementById('temperature-threshold-value').textContent = this.value;
+                checkAlerts();
+            });
+            
+            document.getElementById('voltage-threshold').addEventListener('input', function() {
+                document.getElementById('voltage-threshold-value').textContent = this.value;
+                checkAlerts();
+            });
+            
+            document.getElementById('current-threshold').addEventListener('input', function() {
+                document.getElementById('current-threshold-value').textContent = this.value;
+                checkAlerts();
+            });
+            
+            // 显示通知权限请求
+            if (Notification && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                Notification.requestPermission();
+            }
+        }
+        
+        // 开始数据模拟
+        function startDataSimulation() {
+            // 清除之前的定时器
+            if (dataInterval) {
+                clearInterval(dataInterval);
+            }
+            
+            // 获取采样频率
+            const sampleRate = parseInt(document.getElementById('sample-rate').value);
+            const interval = 1000 / sampleRate;
+            
+            // 更新数据速率显示
+            document.getElementById('data-rate').textContent = sampleRate;
+            
+            // 设置新的定时器
+            dataInterval = setInterval(function() {
+                // 生成模拟数据
+                const temperature = generateRandomValue(20, 30, 0.5);
+                const voltage = generateRandomValue(1, 3, 0.01);
+                const current = generateRandomValue(40, 50, 0.2);
+                
+                // 确定状态
+                let status = 'normal';
+                let statusClass = 'bg-green-500';
+                
+                if (temperature < warningMin || temperature > warningMax) {
+                    status = 'warning';
+                    statusClass = 'bg-yellow-500';
+                    
+                    // 如果启用了警告，显示警告模态框
+                    if (document.getElementById('enable-alert').checked) {
+                        showAlert(`温度 ${temperature.toFixed(1)}°C 超出正常范围 (${warningMin}°C - ${warningMax}°C)`);
+                    }
+                }
+                
+                // 更新数据点计数和时间
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                
+                // 创建数据点对象
+                const dataPoint = {
+                    time: timeString,
+                    timestamp: now.getTime(),
+                    temperature: temperature,
+                    voltage: voltage,
+                    current: current,
+                    status: status,
+                    statusClass: statusClass
+                };
+                
+                // 添加到数据点数组
+                dataPoints.push(dataPoint);
+                
+                // 限制数据点数量
+                if (dataPoints.length > 100) {
+                    dataPoints.shift();
+                }
+                
+                // 更新图表和面板
+                updateCharts(dataPoint);
+                updateDataPanel(dataPoint);
+                updateDataLog(dataPoint);
+                updateLastUpdateTime();
+                checkAlerts();
+            }, interval);
+        }
+        
+        // 停止数据模拟
+        function stopDataSimulation() {
+            if (dataInterval) {
+                clearInterval(dataInterval);
+                dataInterval = null;
+            }
+        }
+        
+        // AI预测分析相关函数
+        function initAIPrediction() {
+            // 设置日期选择器为昨天
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const formattedDate = yesterday.toISOString().split('T')[0];
+            document.getElementById('datePicker').value = formattedDate;
+            
+            // 初始化预测对比图表
+            initPredictionComparisonChart();
+            
+            // 绑定事件
+            document.getElementById('ai-prediction-nav').addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('ai-prediction-panel').classList.toggle('hidden');
+            });
+            
+            document.getElementById('close-prediction-panel').addEventListener('click', function() {
+                document.getElementById('ai-prediction-panel').classList.add('hidden');
+            });
+            
+            document.getElementById('fetchPredictionBtn').addEventListener('click', function() {
+                fetchPredictionData();
+            });
+            
+            document.getElementById('export-prediction').addEventListener('click', function() {
+                exportPredictionReport();
+            });
+        }
+        
+        // 初始化预测对比图表
+        function initPredictionComparisonChart() {
+            const ctx = document.getElementById('predictionComparisonChart').getContext('2d');
+            predictionComparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['温度 (°C)', '压力值 (G)', '震动程度 (Z)', '稳定性评分'],
+                    datasets: [{
+                        label: '预测值',
+                        data: [25.4, 3.35, 45.2, 92],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderRadius: 6
+                    }, {
+                        label: '实际值',
+                        data: [25.1, 3.42, 45.8, 95],
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000
+                    }
+                }
+            });
+        }
+        
+        // 获取预测数据
+        function fetchPredictionData() {
+            // 显示加载状态
+            const loadingState = document.getElementById('loadingState');
+            loadingState.classList.remove('hidden');
+            
+            // 模拟AI分析过程
+            setTimeout(() => {
+                // 隐藏加载状态
+                loadingState.classList.add('hidden');
+                
+                // 更新预测图表
+                updatePredictionChart();
+                
+                // 显示成功提示
+                showNotification('AI预测分析已完成', 'success');
+            }, 1500);
+        }
+        
+        // 更新预测图表
+        function updatePredictionChart() {
+            // 从历史数据中获取最近的数据点
+            const recentData = dataPoints.slice(-24);
+            
+            // 如果没有足够的数据，使用默认值
+            if (recentData.length < 12) {
+                return;
+            }
+            
+            // 计算历史数据的平均值
+            const avgTemp = recentData.reduce((sum, point) => sum + point.temperature, 0) / recentData.length;
+            const avgVoltage = recentData.reduce((sum, point) => sum + point.voltage, 0) / recentData.length;
+            const avgCurrent = recentData.reduce((sum, point) => sum + point.current, 0) / recentData.length;
+            
+            // 计算预测值（基于历史趋势的简单线性预测）
+            const predictedTemp = avgTemp + (recentData[recentData.length - 1].temperature - recentData[0].temperature) * 0.2;
+            const predictedVoltage = avgVoltage + (recentData[recentData.length - 1].voltage - recentData[0].voltage) * 0.2;
+            const predictedCurrent = avgCurrent + (recentData[recentData.length - 1].current - recentData[0].current) * 0.2;
+            
+            // 计算稳定性评分
+            const stabilityScore = calculateStabilityScore(predictedTemp, predictedVoltage, predictedCurrent);
+            
+            // 更新新图表数据
+            predictionComparisonChart.data.datasets[0].data = [
+                predictedTemp.toFixed(1),
+                predictedVoltage.toFixed(2),
+                predictedCurrent.toFixed(1),
+                stabilityScore
+            ];
+            
+            // 使用实际值（最后一个数据点）
+            const lastDataPoint = recentData[recentData.length - 1];
+            predictionComparisonChart.data.datasets[1].data = [
+                lastDataPoint.temperature.toFixed(1),
+                lastDataPoint.voltage.toFixed(2),
+                lastDataPoint.current.toFixed(1),
+                calculateStabilityScore(lastDataPoint.temperature, lastDataPoint.voltage, lastDataPoint.current)
+            ];
+            
+            predictionComparisonChart.update();
+            
+            // 更新表格数据
+            updatePredictionTable(predictedTemp, predictedVoltage, predictedCurrent, stabilityScore, lastDataPoint);
+        }
+        
+        // 计算稳定性评分
+        function calculateStabilityScore(temperature, voltage, current) {
+            // 基于各项指标的正常范围计算评分
+            const tempScore = Math.max(0, Math.min(100, 100 - Math.abs(temperature - 25) * 5));
+            const voltageScore = Math.max(0, Math.min(100, 100 - Math.abs(voltage - 3.3) * 50));
+            const currentScore = Math.max(0, Math.min(100, 100 - Math.abs(current - 45) * 2));
+            
+            // 加权平均
+            return Math.round((tempScore * 0.3 + voltageScore * 0.3 + currentScore * 0.4));
+        }
+        
+        // 更新预测表格
+        function updatePredictionTable(predictedTemp, predictedVoltage, predictedCurrent, predictedStability, lastDataPoint) {
+            // 计算偏差
+            const tempDiff = ((predictedTemp - lastDataPoint.temperature) / lastDataPoint.temperature * 100).toFixed(1);
+            const voltageDiff = ((predictedVoltage - lastDataPoint.voltage) / lastDataPoint.voltage * 100).toFixed(1);
+            const currentDiff = ((predictedCurrent - lastDataPoint.current) / lastDataPoint.current * 100).toFixed(1);
+            const stabilityDiff = (predictedStability - calculateStabilityScore(lastDataPoint.temperature, lastDataPoint.voltage, lastDataPoint.current)).toFixed(1);
+            
+            // 获取表格行
+            const rows = document.querySelectorAll('#predictionResult tbody tr');
+            
+            // 更新温度行
+            updatePredictionRow(rows[0], [
+                '温度 (°C)',
+                predictedTemp.toFixed(1),
+                lastDataPoint.temperature.toFixed(1),
+                tempDiff,
+                getStatusClass(tempDiff)
+            ]);
+            
+            // 更新电压行
+            updatePredictionRow(rows[1], [
+                '压力值 (G)',
+                predictedVoltage.toFixed(2),
+                lastDataPoint.voltage.toFixed(2),
+                voltageDiff,
+                getStatusClass(voltageDiff)
+            ]);
+            
+            // 更新电流行
+            updatePredictionRow(rows[2], [
+                '震动程度 (Z)',
+                predictedCurrent.toFixed(1),
+                lastDataPoint.current.toFixed(1),
+                currentDiff,
+                getStatusClass(currentDiff)
+            ]);
+            
+            // 更新稳定性评分行
+            updatePredictionRow(rows[3], [
+                '稳定性评分',
+                predictedStability.toString(),
+                calculateStabilityScore(lastDataPoint.temperature, lastDataPoint.voltage, lastDataPoint.current).toString(),
+                stabilityDiff,
+                getStatusClass(stabilityDiff)
+            ]);
+        }
+        
+        // 更新预测表格行
+        function updatePredictionRow(row, data) {
+            const cells = row.querySelectorAll('td');
+            
+            // 更新指标名称
+            cells[0].textContent = data[0];
+            
+            // 更新预测值
+            cells[1].textContent = data[1];
+            
+            // 更新实际值
+            cells[2].textContent = data[2];
+            
+            // 更新偏差
+            const diffCell = cells[3];
+            diffCell.textContent = data[3] + '%';
+            
+            // 设置偏差颜色
+            if (parseFloat(data[3]) > 0) {
+                diffCell.className = 'px-4 py-3 whitespace-nowrap text-sm text-red-500';
+            } else {
+                diffCell.className = 'px-4 py-3 whitespace-nowrap text-sm text-green-500';
+            }
+            
+            // 更新状态
+            const statusCell = cells[4];
+            statusCell.innerHTML = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${data[4]}">${data[5]</span>`;
+        }
+        
+        // 获取状态类
+        function getStatusClass(diff) {
+            const diffValue = parseFloat(diff);
+            
+            if (Math.abs(diffValue) <= 2) {
+                return ['bg-green-100 text-green-800', '良好'];
+            } else if (Math.abs(diffValue) <= 5) {
+                return ['bg-yellow-100 text-yellow-800', '需关注'];
+            } else {
+                return ['bg-red-100 text-red-800', '异常'];
+            }
+        }
+        
+        // 导出预测报告
+        function exportPredictionReport() {
+            // 生成报告内容
+            const reportDate = new Date().toLocaleString();
+            const reportTitle = `AI预测分析报告 - ${reportDate}`;
+            
+            // 获取最新的数据点
+            const lastDataPoint = dataPoints[dataPoints.length - 1];
+            
+            // 计算稳定性评分
+            const stabilityScore = calculateStabilityScore(lastDataPoint.temperature, lastDataPoint.voltage, lastDataPoint.current);
+            
+            // 生成报告HTML
+            let reportHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>${reportTitle}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+                    h1 { color: #3b82f6; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+                    h2 { color: #1e293b; margin-top: 30px; }
+                    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f8fafc; }
+                    .summary { background-color: #f1f5f9; padding: 20px; border-radius: 5px; margin-bottom: 30px; }
+                    .status { padding: 5px 10px; border-radius: 20px; color: white; font-weight: bold; }
+                    .status-good { background-color: #10b981; }
+                    .status-warning { background-color: #f59e0b; }
+                    .status-danger { background-color: #ef4444; }
+                    .footer { margin-top: 50px; text-align: center; color: #6b7280; font-size: 0.9em; }
+                </style>
+            </head>
+            <body>
+                <h1>${reportTitle}</h1>
+                
+                <div class="summary">
+                    <h2>预测摘要</h2>
+                    <p>基于历史数据分析，AI预测昨日数据整体体表现良好，主要指标在正常范围内波动。</p>
+                    <p>系统识别到0个关键趋势变化，整体运行稳定。</p>
+                </div>
+                
+                <h2>关键指标预测与实际对比</h2>
+                <table>
+                    <tr>
+                        <th>指标名称</th>
+                        <th>预测值</th>
+                        <th>实际值</th>
+                        <th>偏差</th>
+                        <th>状态</th>
+                    </tr>
+                    <tr>
+                        <td>温度 (°C)</td>
+                        <td>25.4</td>
+                        <td>${lastDataPoint.temperature.toFixed(1)}</td>
+                        <td>-1.2%</td>
+                        <td><span class="status status-good">良好</span></td>
+                    </tr>
+                    <tr>
+                        <td>压力值 (G)</td>
+                        <td>3.35</td>
+                        <td>${lastDataPoint.voltage.toFixed(2)}</td>
+                        <td>+2.1%</td>
+                        <td><span class="status status-warning">需关注</span></td>
+                    </tr>
+                    <tr>
+                        <td>震动程度 (Z)</td>
+                        <td>45.2</td>
+                        <td>${lastDataPoint.current.toFixed(1)}</td>
+                        <td>+1.3%</td>
+                        <td><span class="status status-good">良好</span></td>
+                    </tr>
+                    <tr>
+                        <td>稳定性评分</td>
+                        <td>92</td>
+                        <td>${stabilityScore}</td>
+                        <td>+3.3%</td>
+                        <td><span class="status status-good">良好</span></td>
+                    </tr>
+                </table>
+                
+                <h2>AI分析建议</h2>
+                <ul>
+                    <li>压力值出现实际值略高于预测值，建议建议建议检查传感器校准或环境因素影响</li>
+                    <li>温度和震动程度在正常范围内波动，系统运行稳定</li>
+                    <li>基于历史模式，预计未来24小时内温度将保持稳定</li>
+                </ul>
+                
+                <div class="footer">
+                    <p>报告生成时间: ${new Date().toLocaleString()}</p>
+                    <p>芯片数据实时接收系统 v1.0</p>
+                </div>
+            </body>
+            </html>
+            `;
+            
+            // 创建Blob对象
+            const blob = new Blob([reportHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            
+            // 创建下载链接
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AI预测分析报告_${new Date().toISOString().split('T')[0]}.html`;
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+        }
+        
+        // 生成随机值，带有一定的趋势
+        function generateRandomValue(min, max, step) {
+            // 基于当前时间生成一个伪随机数
+            const random = Math.sin(Date.now() * 0.001) * 0.5 + 0.5;
+            let value = min + random * (max - min);
+            
+            // 添加一些小的随机波动
+            value += (Math.random() - 0.5) * step;
+            
+            // 确保值在范围内
+            return Math.max(min, Math.min(max, value));
+        }
+        
+        // 更新图表
+        function updateCharts(dataPoint) {
+            if (isPaused) {
+                return;
+            }
+            
+            // 更新主数据图表
+            const dataType = currentDataType;
+            let value, label, color, min, max;
+            
+            switch (dataType) {
+                case 'temperature':
+                    value = dataPoint.temperature;
+                    label = '温度 (°C)';
+                    color = '#3b82f6';
+                    min = 20;
+                    max = 30;
+                    break;
+                case 'voltage':
+                    value = dataPoint.voltage;
+                    label = '压力值 (G)';
+                    color = '#10b981';
+                    min = 0;
+                    max = 5;
+                    break;
+                case 'current':
+                    value = dataPoint.current;
+                    label = '震动程度 (Z)';
+                    color = '#f59e0b';
+                    min = 40;
+                    max = 50;
+                    break;
+                case 'custom':
+                    value = generateRandomValue(0, 100, 1);
+                    label = '自定义数据';
+                    color = '#8b5cf6';
+                    min = 0;
+                    max = 100;
+                    break;
+            }
+            
+            // 更新图表标题
+            dataChart.data.datasets[0].label = label;
+            
+            // 更新图表数据
+            dataChart.data.labels.push(dataPoint.time);
+            dataChart.data.datasets[0].data.push(value);
+            dataChart.data.datasets[0].borderColor = color;
+            dataChart.data.datasets[0].backgroundColor = `${color}20`;
+            
+            // 更新Y轴范围
+            dataChart.options.scales.y.min = min;
+            dataChart.options.scales.y.max = max;
+            
+            // 限制数据点数量
+            const displayRange = parseInt(document.getElementById('display-range').value) || 50;
+            if (dataChart.data.labels.length > displayRange) {
+                dataChart.data.labels.shift();
+                dataChart.data.datasets[0].data.shift();
+            }
+            
+            // 更新图表
+            dataChart.update();
+            
+            // 更新仪表盘
+            updateGauge(temperatureGauge, dataPoint.temperature, 20, 30, '#3b82f6');
+            updateGauge(voltageGauge, dataPoint.voltage, 0, 5, '#10b981');
+            updateGauge(currentGauge, dataPoint.current, 40, 50, '#f59e0b');
+            
+            // 更新仪表盘显示的值
+            document.getElementById('temperature-value').textContent = dataPoint.temperature.toFixed(1);
+            document.getElementById('voltage-value').textContent = dataPoint.voltage.toFixed(2);
+            document.getElementById('current-value').textContent = dataPoint.current.toFixed(1);
+            
+            // 更新建筑稳定性相关指标
+            updateStabilityMetrics();
+        }
+        
+        // 更新仪表盘
+        function updateGauge(gauge, value, min, max, color) {
+            const percentage = ((value - min) / (max - min)) * 100;
+            const remaining = 100 - percentage;
+            
+            gauge.data.datasets[0].data = [percentage, remaining];
+            gauge.data.datasets[0].backgroundColor[0] = color;
+            gauge.update();
+        }
+        
+        // 更新数据面板
+        function updateDataPanel(dataPoint) {
+            // 更新数值显示
+            document.getElementById('temperature-value').textContent = dataPoint.temperature.toFixed(1);
+            document.getElementById('voltage-value').textContent = dataPoint.voltage.toFixed(2);
+            document.getElementById('current-value').textContent = dataPoint.current.toFixed(1);
+            
+            // 更新统计数据
+            updateStatistics();
+        }
+        
+        // 更新统计数据
+        function updateStatistics() {
+            if (dataPoints.length === 0) return;
+            
+            // 计算温度统计
+            const temperatures = dataPoints.map(point => point.temperature);
+            const tempMax = Math.max(...temperatures);
+            const tempMin = Math.min(...temperatures);
+            const tempAvg = temperatures.reduce((sum, val) => sum + val, 0) / temperatures.length;
+            
+            // 计算压力值统计
+            const voltages = dataPoints.map(point => point.voltage);
+            const voltMax = Math.max(...voltages);
+            const voltMin = Math.min(...voltages);
+            const voltAvg = voltages.reduce((sum, val) => sum + val, 0) / voltages.length;
+            
+            // 计算震动程度统计
+            const currents = dataPoints.map(point => point.current);
+            const currMax = Math.max(...currents);
+            const currMin = Math.min(...currents);
+            const currAvg = currents.reduce((sum, val) => sum + val, 0) / currents.length;
+            
+            // 更新显示
+            document.getElementById('temperature-max').textContent = tempMax.toFixed(1);
+            document.getElementById('temperature-min').textContent = tempMin.toFixed(1);
+            document.getElementById('temperature-avg').textContent = tempAvg.toFixed(1);
+            
+            document.getElementById('voltage-max').textContent = voltMax.toFixed(2);
+            document.getElementById('voltage-min').textContent = voltMin.toFixed(2);
+            document.getElementById('voltage-avg').textContent = voltAvg.toFixed(2);
+            
+            document.getElementById('current-max').textContent = currMax.toFixed(1);
+            document.getElementById('current-min').textContent = currMin.toFixed(1);
+            document.getElementById('current-avg').textContent = currAvg.toFixed(1);
+        }
+        
+        // 更新数据日志
+        function updateDataLog(dataPoint) {
+            const tableBody = document.getElementById('data-log');
+            const row = document.createElement('tr');
+            
+            // 设置状态样式
+            let statusText = '正常';
+            let statusClass = 'bg-green-100 text-green-800';
+            
+            if (dataPoint.status === 'warning') {
+                statusText = '警告';
+                statusClass = 'bg-yellow-100 text-yellow-800';
+            } else if (dataPoint.status === 'error') {
+                statusText = '错误';
+                statusClass = 'bg-red-100 text-red-800';
+            }
+            
+            // 创建单元格
+            row.innerHTML = `
+                <td>${dataPoint.time}</td>
+                <td>${dataPoint.temperature.toFixed(1)}</td>
+                <td>${dataPoint.voltage.toFixed(2)}</td>
+                <td>${dataPoint.current.toFixed(1)}</td>
+                <td><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${statusText}</span></td>
+            `;
+            
+            // 添加到表格
+            tableBody.appendChild(row);
+            
+            // 限制日志条目数量
+            if (tableBody.children.length > 20) {
+                tableBody.removeChild(tableBody.firstChild);
+            }
+            
+            // 更新日志计数
+            document.getElementById('log-count').textContent = dataPoints.length;
+        }
+        
+        // 更新建筑稳定性相关指标
+        function updateStabilityMetrics() {
+            // 模拟建筑稳定性数据
+            const vibration = generateRandomValue(0, 0.1, 0.001);
+            const displacement = generateRandomValue(0, 1.0, 0.01);
+            const tilt = generateRandomValue(0, 5.0, 0.01);
+            
+            // 更新显示
+            document.getElementById('vibration-value').textContent = vibration.toFixed(2) + ' g';
+            document.getElementById('displacement-value').textContent = displacement.toFixed(2) + ' mm';
+            document.getElementById('tilt-value').textContent = tilt.toFixed(1) + '°';
+            
+            // 更新进度条
+            document.getElementById('vibration-bar').style.width = (vibration / 0.1 * 100) + '%';
+            document.getElementById('displacement-bar').style.width = (displacement / 1.0 * 100) + '%';
+            document.getElementById('tilt-bar').style.width = (tilt / 5.0 * 100) + '%';
+            
+            // 更新稳定性评分
+            const stabilityScore = calculateStabilityScore(vibration, displacement, tilt);
+            document.getElementById('stability-value').textContent = stabilityScore;
+            
+            // 更新稳定性仪表盘
+            updateGauge(stabilityGauge, stabilityScore, 0, 100, getStabilityColor(stabilityScore));
+            
+            // 更新稳定性状态
+            updateStabilityStatus(stabilityScore);
+            
+            // 更新稳定性历史趋势
+            updateStabilityHistory(stabilityScore);
+            
+            // 更新系统资源监控
+            updateSystemResources();
+        }
+        
+        // 计算稳定性评分
+        function calculateStabilityScore(vibration, displacement, tilt) {
+            // 基于各项指标计算稳定性评分
+            const vibrationScore = Math.max(0, Math.min(100, 100 - (vibration / 0.1 * 100)));
+            const displacementScore = Math.max(0, Math.min(100, 100 - (displacement / 1.0 * 100)));
+            const tiltScore = Math.max(0, Math.min(100, 100 - (tilt / 5.0 * 100)));
+            
+            // 加权平均
+            return Math.round((vibrationScore * 0.4 + displacementScore * 0.3 + tiltScore * 0.3));
+        }
+        
+        // 获取稳定性颜色
+        function getStabilityColor(score) {
+            if (score >= 80) return '#10b981'; // 绿色：良好
+            if (score >= 60) return '#f59e0b'; // 黄色：一般
+            return '#ef4444'; // 红色：较差
+        }
+        
+        // 更新稳定性状态
+        function updateStabilityStatus(score) {
+            const statusElement = document.getElementById('stability-status');
+            
+            if (score >= 80) {
+                statusElement.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+                statusElement.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>正常';
+            } else if (score >= 60) {
+                statusElement.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
+                statusElement.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-yellow-500 mr-1"></span>注意';
+            } else {
+                statusElement.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+                statusElement.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>危险';
+            }
+        }
+        
+        // 更新稳定性历史趋势
+        function updateStabilityHistory(score) {
+            // 添加新数据点
+            stabilityChart.data.datasets[0].data.push(score);
+            
+            // 移除最旧的数据点
+            stabilityChart.data.datasets[0].data.shift();
+            
+            // 更新图表
+            stabilityChart.update();
+        }
+        
+        // 更新系统资源监控
+        function updateSystemResources() {
+            // 模拟系统资源数据
+            const cpuUsage = generateRandomValue(10, 20, 1);
+            const memoryUsage = generateRandomValue(40, 50, 1);
+            
+            // 更新显示
+            document.getElementById('cpu-usage').textContent = cpuUsage.toFixed(0) + '%';
+            document.getElementById('memory-usage').textContent = memoryUsage.toFixed(0) + '%';
+            
+            // 更新进度条
+            document.getElementById('cpu-bar').style.width = cpuUsage + '%';
+            document.getElementById('memory-bar').style.width = memoryUsage + '%';
+            
+            // 更新系统资源图表
+            systemChart.data.datasets[0].data.push(cpuUsage);
+            systemChart.data.datasets[1].data.push(memoryUsage);
+            
+            // 移除最旧的数据点
+            systemChart.data.datasets[0].data.shift();
+            systemChart.data.datasets[1].data.shift();
+            
+            // 更新图表
+            systemChart.update();
+        }
+        
+        // 更新图表类型
+        function updateChartType() {
+            // 清空图表数据
+            dataChart.data.labels = [];
+            dataChart.data.datasets[0].data = [];
+            
+            // 根据当前选择的数据类型添加数据
+            switch (currentDataType) {
+                case 'temperature':
+                    dataPoints.forEach(point => {
+                        dataChart.data.labels.push(point.time);
+                        dataChart.data.datasets[0].data.push(point.temperature);
+                    });
+                    break;
+                case 'voltage':
+                    dataPoints.forEach(point => {
+                        dataChart.data.labels.push(point.time);
+                        dataChart.data.datasets[0].data.push(point.voltage);
+                    });
+                    break;
+                case 'current':
+                    dataPoints.forEach(point => {
+                        dataChart.data.labels.push(point.time);
+                        dataChart.data.datasets[0].data.push(point.current);
+                    });
+                    break;
+                case 'custom':
+                    // 生成随机数据
+                    for (let i = 0; i < 20; i++) {
+                        const time = new Date(Date.now() - (20 - i) * 3000).toLocaleTimeString();
+                        dataChart.data.labels.push(time);
+                        dataChart.data.datasets[0].data.push(generateRandomValue(0, 100, 5));
+                    }
+                    break;
+            }
+            
+            // 更新图表
+            updateCharts(dataPoints[dataPoints.length - 1]);
+        }
+        
+        // 导出数据
+        function exportData(format) {
+            if (dataPoints.length === 0) {
+                showNotification('没有数据可导出', 'warning');
+                return;
+            }
+            
+            let dataStr, fileName, mimeType;
+            
+            if (format === 'csv') {
+                // 生成CSV
+                dataStr = 'data:text/csv;charset=utf-8,';
+                dataStr += '时间,温度(°C),压力值(G),震动程度(Z),状态\n';
+                
+                dataPoints.forEach(point => {
+                    dataStr += `${point.time},${point.temperature.toFixed(1)},${point.voltage.toFixed(2)},${point.current.toFixed(1)},${point.status === 'normal' ? '正常' : point.status === 'warning' ? '警告' : '错误'}\n`;
+                });
+                
+                fileName = `chip_data_${new Date().toISOString().slice(0, 10)}.csv`;
+                mimeType = 'text/csv';
+            } else {
+                // 生成JSON
+                const data = dataPoints.map(point => ({
+                    time: point.time,
+                    timestamp: point.timestamp,
+                    temperature: point.temperature.toFixed(1),
+                    voltage: point.voltage.toFixed(2),
+                    current: point.current.toFixed(1),
+                    status: point.status
+                }));
+                
+                dataStr = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+                fileName = `chip_data_${new Date().toISOString().slice(0, 10)}.json`;
+                mimeType = 'application/json';
+            }
+            
+            // 创建下载链接
+            const downloadLink = document.createElement('a');
+            downloadLink.href = dataStr;
+            downloadLink.download = fileName;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // 显示成功提示
+            showNotification(`数据已成功导出为 ${fileName}`, 'success');
+        }
+        
+        // 显示警告模态框
+        function showAlert(message) {
+            // 创建警告元素
+            const alertElement = document.createElement('div');
+            alertElement.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg z-50 flex items-center';
+            alertElement.innerHTML = `
+                <i class="fa fa-exclamation-triangle mr-2"></i>
+                <span>${message}</span>
+                <button class="ml-4 text-white hover:text-gray-200">
+                    <i class="fa fa-times"></i>
+                </button>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(alertElement);
+            
+            // 添加关闭按钮事件
+            alertElement.querySelector('button').addEventListener('click', function() {
+                alertElement.remove();
+            });
+            
+            // 3秒后自动关闭
+            setTimeout(function() {
+                alertElement.remove();
+            }, 3000);
+        }
+        
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            // 创建通知元素
+            const notificationElement = document.createElement('div');
+            notificationElement.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 flex items-center ${type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'} text-white`;
+            notificationElement.innerHTML = `
+                <i class="fa fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+                <span>${message}</span>
+                <button class="ml-4 text-white hover:text-gray-200">
+                    <i class="fa fa-times"></i>
+                </button>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(notificationElement);
+            
+            // 添加关闭按钮事件
+            notificationElement.querySelector('button').addEventListener('click', function() {
+                notificationElement.remove();
+            });
+            
+            // 3秒后自动关闭
+            setTimeout(function() {
+                notificationElement.remove();
+            }, 3000);
+        }
+        
+        // 更新最后更新时间
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString();
+            document.getElementById('last-update').textContent = timeString;
+        }
+        
+        // 检查预警
+        function checkAlerts() {
+            if (!document.getElementById('alert-toggle').checked) {
+                return;
+            }
+            
+            const temperatureValue = parseFloat(document.getElementById('temperature-value').textContent);
+            const voltageValue = parseFloat(document.getElementById('voltage-value').textContent);
+            const currentValue = parseFloat(document.getElementById('current-value').textContent);
+            
+            const temperatureThreshold = parseFloat(document.getElementById('temperature-threshold').value);
+            const voltageThreshold = parseFloat(document.getElementById('voltage-threshold').value);
+            const currentThreshold = parseFloat(document.getElementById('current-threshold').value);
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            
+            // 温度预警
+            if (temperatureValue > temperatureThreshold) {
+                addAlert(timeString, '温度', temperatureValue, temperatureThreshold, '超过阈值');
+            }
+            
+            // 压力值预警
+            if (voltageValue > voltageThreshold) {
+                addAlert(timeString, '压力值', voltageValue, voltageThreshold, '超过阈值');
+            }
+            
+            // 震动程度预警
+            if (currentValue > currentThreshold) {
+                addAlert(timeString, '震动程度', currentValue, currentThreshold, '超过阈值');
+            }
+        }
+        
+        // 添加预警记录
+        function addAlert(time, type, value, threshold, status) {
+            // 检查是否已经存在相同的预警
+            const existingAlert = alertHistory.find(a => 
+                a.time === time && 
+                a.type === type && 
+                a.value === value && 
+                a.threshold === threshold
+            );
+            
+            if (existingAlert) {
+                return;
+            }
+            
+            const alert = { time, type, value, threshold, status };
+            alertHistory.unshift(alert); // 添加到开头
+            
+            // 限制预警记录数量
+            if (alertHistory.length > 10) {
+                alertHistory.pop();
+            }
+            
+            // 更新预警历史记录表格
+            updateAlertHistory();
+            
+            // 显示预警通知
+            showAlertNotification(type, value, threshold);
+        }
+        
+        // 更新预警历史记录表格
+        function updateAlertHistory() {
+            const tableBody = document.getElementById('alert-history');
+            tableBody.innerHTML = '';
+            
+            alertHistory.forEach(alert => {
+                const row = document.createElement('tr');
+                
+                const timeCell = document.createElement('td');
+                timeCell.className = 'px-4 py-2 text-sm';
+                timeCell.textContent = alert.time;
+                row.appendChild(timeCell);
+                
+                const typeCell = document.createElement('td');
+                typeCell.className = 'px-4 py-2 text-sm';
+                typeCell.textContent = alert.type;
+                row.appendChild(typeCell);
+                
+                const valueCell = document.createElement('td');
+                valueCell.className = 'px-4 py-2 text-sm';
+                valueCell.textContent = alert.value;
+                row.appendChild(valueCell);
+                
+                const thresholdCell = document.createElement('td');
+                thresholdCell.className = 'px-4 py-2 text-sm';
+                thresholdCell.textContent = alert.threshold;
+                row.appendChild(thresholdCell);
+                
+                const statusCell = document.createElement('td');
+                statusCell.className = 'px-4 py-2 text-sm';
+                
+                const statusBadge = document.createElement('span');
+                statusBadge.className = 'px-2 py-1 text-xs rounded-full bg-red-100 text-red-800';
+                statusBadge.textContent = alert.status;
+                statusCell.appendChild(statusBadge);
+                
+                row.appendChild(statusCell);
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // 显示预警通知
+        function showAlertNotification(type, value, threshold) {
+            // 检查是否在Electron环境中
+            if (window.electronAPI) {
+                // 使用Electron的通知API
+                window.electronAPI.showNotification({
+                    title: '预警通知',
+                    body: `${type}超过阈值！当前值: ${value}, 阈值: ${threshold}`
+                });
+            } else {
+                // 在浏览器中显示通知
+                if (Notification.permission === 'granted') {
+                    new Notification('预警通知', {
+                        body: `${type}超过阈值！当前值: ${value}, 阈值: ${threshold}`
+                    });
+                } else if (Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            new Notification('预警通知', {
+                                body: `${type}超过阈值！当前值: ${value}, 阈值: ${threshold}`
+                            });
+                        }
+                    });
+                }
+                
+                // 显示浏览器通知
+                showAlert(`${type}超过阈值！当前值: ${value}, 阈值: ${threshold}`);
+            }
+        }
+        
+        // 设置背景动画
+        function setupBackgroundAnimation() {
+            const canvas = document.getElementById('animationBackground');
+            const ctx = canvas.getContext('2d');
+            let points = [];
+            let mouseX = 0;
+            let mouseY = 0;
+            
+            // 设置画布大小
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 创建初始点阵
+            for (let i = 0; i < 50; i++) {
+                points.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 1.5 + 0.5,
+                    speedX: (Math.random() - 0.5) * 0.3,
+                    speedY: (Math.random() - 0.5) * 0.3
+                });
+            }
+            
+            // 鼠标移动监听
+            document.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                mouseX = e.clientX - rect.left;
+                mouseY = e.clientY - rect.top;
+            });
+            
+            // 动画循环
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 0.3;
+            
+                for (let i = 0; i < points.length; i++) {
+                    const point = points[i];
+                
+                    // 更新点的位置
+                    point.x += point.speedX;
+                    point.y += point.speedY;
+                
+                    // 边界检查
+                    if (point.x < 0 || point.x > canvas.width) point.speedX *= -1;
+                    if (point.y < 0 || point.y > canvas.height) point.speedY *= -1;
+                
+                    // 绘制点
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, point.size, 0, Math.PI * 2);
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fill();
+                
+                    // 绘制连接线
+                    for (let j = i + 1; j < points.length; j++) {
+                        const otherPoint = points[j];
+                        const distance = Math.sqrt(
+                            Math.pow(point.x - otherPoint.x, 2) + 
+                            Math.pow(point.y - otherPoint.y, 2)
+                        );
+                    
+                        if (distance < 100) {
+                            ctx.beginPath();
+                            ctx.moveTo(point.x, point.y);
+                            ctx.lineTo(otherPoint.x, otherPoint.y);
+                            ctx.stroke();
+                        }
+                    }
+                
+                    // 鼠标交互 - 让点轻微向鼠标位置偏移
+                    const mouseDistance = Math.sqrt(
+                        Math.pow(point.x - mouseX, 2) + 
+                        Math.pow(point.y - mouseY, 2)
+                    );
+                
+                    if (mouseDistance < 150) {
+                        const angle = Math.atan2(mouseY - point.y, mouseX - point.x);
+                        point.x += Math.cos(angle) * 0.2;
+                        point.y += Math.sin(angle) * 0.2;
+                    }
+                }
+            
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>

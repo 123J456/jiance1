@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>稳定性趋势图表展示</title>
+    <!-- Tailwind CSS -->
+    <script src="https://://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#8b5cf6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        info: '#6b7280',
+                        light: '#f8fafc',
+                        dark: '#1e293b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+        }
+    </style>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white border-b border-gray-200 shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="w-8 h-8 mr-3">
+                    <svg viewBox="0 0 24 24" class="text-primary w-full h-full">
+                        <polyline points="3,12 8,7 12,11 16,7 21,12" fill="none" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">稳定性趋势图表展示</h1>
+            </div>
+            <div>
+                <button id="back-btn" class="btn btn-outline">
+                    <i class="fa fa-arrow-left mr-1"></i> 返回主界面
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- 顶部卡片 -->
+        <div class="bg-white bg-white p-4 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-800">建筑稳定性趋势分析</h2>
+                <div class="flex space-x-2">
+                    <div class="relative inline-block text-left">
+                        <button id="timeRangeDropdown" class="btn btn-outline text-sm py-1">
+                            <span id="selectedTimeRange">最近1小时</span>
+                            <i class="fa fa-chevron-down ml-1"></i>
+                        </button>
+                        <div id="timeRangeOptions" class="hidden absolute z-10 mt-1 w-32 bg-white shadow-lg border border-gray-200 rounded-md">
+                            <div class="py-1">
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-range="1h">最近1小时</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-range="6h">最近6小时</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-range="24h">最近24小时</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-range="7d">最近7天</a>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="refresh-btn" class="btn btn-outline text-sm py-1">
+                        <i class="fa fa-refresh mr-1"></i> 刷新数据
+                    </button>
+                    <button id="export-btn" class="btn btn-primary text-sm py-1">
+                        <i class="fa fa-download mr-1"></i> 导出图表
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 稳定性趋势图表 -->
+            <div class="h-96 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <canvas id="stabilityTrendChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- 关键指标卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- 振动强度强度 -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">振动强度趋势</h3>
+                <div class="h-64">
+                    <canvas id="vibrationChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- 位移 -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">位移趋势</h3>
+                <div class="h-64">
+                    <canvas id="displacementChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- 倾斜角度 -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">倾斜角度趋势</h3>
+                <div class="h-64">
+                    <canvas id="tiltChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI预测分析卡片 -->
+        <div class="bg-white p-4 mb-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-800">AI预测分析</h2>
+                <div class="flex space-x-2">
+                    <div class="flex items-center">
+                        <span id="ai-prediction-status" class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                        <span class="text-xs">AI预测已启用</span>
+                    </div>
+                    <button id="run-prediction" class="btn btn-primary text-sm py-1">
+                        <i class="fa fa-refresh mr-1"></i> 运行预测
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 预测预测预测图表 -->
+            <div class="h-96 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <canvas id="predictionChart"></canvas>
+            </div>
+            
+            <!-- 预测结果分析 -->
+            <div class="mt-4 p-4 bg-blue-50 rounded-md border border-blue-100">
+                <h3 class="text-md font-medium text-gray-800 mb-2">AI预测分析结果</h3>
+                <p id="prediction-result" class="text-gray-700">
+                    基于历史数据分析分析，预测未来24小时内建筑稳定性将保持在<span class="font-medium text-green-600">正常范围</span>，稳定性评分预计在<span class="font-medium">93-95</span>之间。
+                    振动强度和位移指标将保持稳定，无明显异常趋势。建议继续保持当前监控频率。
+                </p>
+            </div>
+        </div>
+        
+        <!-- 数据统计卡片 -->
+        <div class="bg-white p-4 rounded-lg shadow-sm border border border-gray-200">
+            <h3 class="text-lg font-medium text-gray-800 mb-3">数据统计分析</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full data-table">
+                    <thead>
+                        <tr>
+                            <th>指标</th>
+                            <th>平均值</th>
+                            <th>最大值</th>
+                            <th>最小值</th>
+                            <th>标准差</th>
+                            <th>趋势</th>
+                            <th>预测值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="font-medium">稳定性评分</td>
+                            <td>94.5</td>
+                            <td>98.2</td>
+                            <td>92.1</td>
+                            <td>1.2</td>
+                            <td><span class="text-green-500"><i class="fa fa-arrow-up"></i> 稳定</span></td>
+                            <td><span class="font-medium">94.2</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">振动强度 (g)</td>
+                            <td>0.025</td>
+                            <td>0.042</td>
+                            <td>0.018</td>
+                            <td>0.005</td>
+                            <td><span class="text-yellow-500"><i class="fa fa-arrow-right"></i> 持平</span></td>
+                            <td><span class="font-medium">0.024</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">位移 (mm)</td>
+                            <td>0.12</td>
+                            <td>0.18</td>
+                            <td>0.08</td>
+                            <td>0.03</td>
+                            <td><span class="text-green-500"><i class="fa fa-arrow-down"></i> 下降</span></td>
+                            <td><span class="font-medium">0.11</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">倾斜角度 (°)</td>
+                            <td>0.45</td>
+                            <td>0.62</td>
+                            <td>0.38</td>
+                            <td>0.07</td>
+                            <td><span class="text-yellow-500"><i class="fa fa-arrow-right"></i> 持平</span></td>
+                            <td><span class="font-medium">0.46</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-4 mt-6">
+        <div class="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="text-sm text-gray-500 mb-2 md:mb-0">
+                © 2023 芯片数据实时接收系统 | 版本 1.0.0
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                    <span class="text-xs">正常</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
+                    <span class="text-xs">警告</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+                    <span class="text-xs">异常</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // 全局变量
+        let stabilityTrendChart, vibrationChart, displacementChart, tiltChart, predictionChart;
+        let currentTimeRange = '1h'; // 默认时间范围
+        let predictionAlgorithmEnabled = true; // AI预测算法启用状态
+        
+        // 模拟数据
+        const mockData = {
+            '1h': {
+                labels: ['10:00', '10:10', '10:20', '10:30', '10:40', '10:50', '11:00'],
+                stabilityScore: [95, 94, 96, 95, 94, 95, 94],
+                vibration: [0.02, 0.025, 0.022, 0.028, 0.024, 0.021, 0.023],
+                displacement: [0.1, 0.12, 0.11, 0.13, 0.12, 0.11, 0.1],
+                tilt: [0.5, 0.52, 0.51, 0.53, 0.52, 0.51, 0.5]
+            },
+            '6h': {
+                labels: ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+                stabilityScore: [96, 95, 94, 95, 94, 94],
+                vibration: [0.02, 0.022, 0.025, 0.023, 0.024, 0.023],
+                displacement: [0.09, 0.1, 0.12, 0.11, 0.12, 0.1],
+                tilt: [0.48, 0.5, 0.52, 0.51, 0.52, 0.5]
+            },
+            '24h': {
+                labels: ['昨天11:00', '昨天15:00', '昨天19:00', '今天03:00', '今天07:00', '今天11:00'],
+                stabilityScore: [97, 96, 95, 94, 95, 94],
+                vibration: [0.018, 0.02, 0.022, 0.025, 0.023, 0.023],
+                displacement: [0.08, 0.09, 0.1, 0.12, 0.11, 0.1],
+                tilt: [0.46, 0.48, 0.5, 0.52, 0.51, 0.5]
+            },
+            '7d': {
+                labels: ['7月15日', '7月16日', '7月17日', '7月18日', '7月19日', '7月20日', '7月21日'],
+                stabilityScore: [98, 97, 96, 95, 95, 94, 94],
+                vibration: [0.015, 0.018, 0.02, 0.022, 0.023, 0.024, 0.023],
+                displacement: [0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.1],
+                tilt: [0.45, 0.46, 0.48, 0.5, 0.51, 0.52, 0.5]
+            }
+        };
+        
+        // 预测数据
+        const predictionData = {
+            '1h': {
+                labels: ['11:10', '11:20', '11:30', '11:40', '11:50', '12:00'],
+                stabilityScore: [94.2, 94.1, 94.0, 93.9, 93.8, 93.7],
+                vibration: [0.024, 0.024, 0.025, 0.025, 0.025, 0.026],
+                displacement: [0.11, 0.11, 0.11, 0.10, 0.10, 0.10],
+                tilt: [0.49, 0.49, 0.48, 0.48, 0.47, 0.47]
+            },
+            '6h': {
+                labels: ['12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
+                stabilityScore: [93.8, 93.6, 93.5, 93.3, 93.2, 93.0],
+                vibration: [0.024, 0.025, 0.025, 0.026, 0.026, 0.027],
+                displacement: [0.10, 0.10, 0.09, 0.09, 0.09, 0.08],
+                tilt: [0.49, 0.48, 0.48, 0.47, 0.47, 0.46]
+            },
+            '24h': {
+                labels: ['今天15:00', '今天19:00', '明天03:00', '明天07:00', '明天11:00', '明天15:00'],
+                stabilityScore: [93.5, 93.2, 93.0, 92.8, 92.7, 92.5],
+                vibration: [0.024, 0.025, 0.026, 0.026, 0.027, 0.027],
+                displacement: [0.10, 0.09, 0.09, 0.08, 0.08, 0.08],
+                tilt: [0.49, 0.48, 0.47, 0.47, 0.46, 0.46]
+            },
+            '7d': {
+                labels: ['7月22日', '7月23日', '7月24日', '7月25日', '7月26日', '7月27日', '7月28日'],
+                stabilityScore: [93.8, 93.6, 93.5, 93.3, 93.2, 93.0, 92.8],
+                vibration: [0.024, 0.025, 0.025, 0.026, 0.026, 0.027, 0.027],
+                displacement: [0.10, 0.10, 0.09, 0.09, 0.09, 0.08, 0.08],
+                tilt: [0.49, 0.48, 0.48, 0.47, 0.47, 0.46, 0.46]
+            }
+        };
+        
+        // 初始化函数
+        function initialize() {
+            initializeCharts();
+            initializeEventListeners();
+            
+            // 初始化预测图表和分析
+            if (predictionAlgorithmEnabled) {
+                updatePredictionChart();
+                updatePredictionAnalysis();
+            }
+        }
+        
+        // 初始化图表
+        function initializeCharts() {
+            // 预测预测预测图表
+            const predictionCtx = document.getElementById('predictionChart').getContext('2d');
+            predictionChart = new Chart(predictionCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: '历史稳定性评分',
+                            data: [],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '预测稳定性评分',
+                            data: [],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '预测置信区间 (上限)',
+                            data: [],
+                            borderColor: 'rgba(59, 130, 246, 0.3)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                            borderWidth: 1,
+                            fill: '+1',
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '预测置信区间 (下限)',
+                            data: [],
+                            borderColor: 'rgba(59, 130, 246, 0.3)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                            borderWidth: 1,
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            enabled: true,
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(1);
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 90,
+                                    yMax: 90,
+                                    borderColor: 'rgba(239, 68, 68, 0.5)',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: '警告阈值',
+                                        enabled: true,
+                                        position: 'start'
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: '时间'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '稳定性评分'
+                            },
+                            min: 85,
+                            max: 100,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+            // 稳定性趋势图表
+            const stabilityTrendCtx = document.getElementById('stabilityTrendChart').getContext('2d');
+            stabilityTrendChart = new Chart(stabilityTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: mockData[currentTimeRange].labels,
+                    datasets: [
+                        {
+                            label: '稳定性评分',
+                            data: mockData[currentTimeRange].stabilityScore,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '振动强度 (g)',
+                            data: mockData[currentTimeRange].vibration,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: '位移 (mm)',
+                            data: mockData[currentTimeRange].displacement,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            yAxisID: 'y2'
+                        },
+                        {
+                            label: '倾斜角度 (°)',
+                            data: mockData[currentTimeRange].tilt,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            yAxisID: 'y3'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '稳定性评分'
+                            },
+                            min: 90,
+                            max: 100
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '振动强度 (g)'
+                            },
+                            min: 0,
+                            max: 0.05,
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: false,
+                            position: 'right',
+                            min: 0,
+                            max: 0.2,
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        },
+                        y3: {
+                            type: 'linear',
+                            display: false,
+                            position: 'right',
+                            min: 0,
+                            max: 1,
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 振动强度图表
+            const vibrationCtx = document.getElementById('vibrationChart').getContext('2d');
+            vibrationChart = new Chart(vibrationCtx, {
+                type: 'line',
+                data: {
+                    labels: mockData[currentTimeRange].labels,
+                    datasets: [{
+                        label: '振动强度 (g)',
+                        data: mockData[currentTimeRange].vibration,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 位移图表
+            const displacementCtx = document.getElementById('displacementChart').getContext('2d');
+            displacementChart = new Chart(displacementCtx, {
+                type: 'line',
+                data: {
+                    labels: mockData[currentTimeRange].labels,
+                    datasets: [{
+                        label: '位移 (mm)',
+                        data: mockData[currentTimeRange].displacement,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 倾斜角度图表
+            const tiltCtx = document.getElementById('tiltChart').getContext('2d');
+            tiltChart = new Chart(tiltCtx, {
+                type: 'line',
+                data: {
+                    labels: mockData[currentTimeRange].labels,
+                    datasets: [{
+                        label: '倾斜角度 (°)',
+                        data: mockData[currentTimeRange].tilt,
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 线性回归算法 - 预测未来趋势
+        function linearRegression(xValues, yValues) {
+            const n = xValues.length;
+            
+            // 计算斜率和截距
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            
+            for (let i = 0; i < n; i++) {
+                sumX += xValues[i];
+                sumY += yValues[i];
+                sumXY += xValues[i] * yValues[i];
+                sumXX += xValues[i] * xValues[i];
+            }
+            
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+            
+            return { slope, intercept };
+        }
+        
+        // 预测未来值
+        function predictFutureValue(xValues, yValues, futureX) {
+            const { slope, intercept } = linearRegression(xValues, yValues);
+            return slope * futureX + intercept;
+        }
+        
+        // 生成预测数据
+        function generatePredictionData() {
+            // 获取当前时间范围的历史数据
+            const historicalData = mockData[currentTimeRange];
+            const labels = historicalData.labels;
+            const historicalScores = historicalData.stabilityScore;
+            
+            // 生成x坐标坐标 (时间点)
+            const xValues = Array.from({length: labels.length}, (_, i) => i);
+            
+            // 使用预测未来值
+            const futurePredictions = [];
+            const confidenceUpperBound = [];
+            const confidenceLowerBound = [];
+            
+            // 为每个预测时间点生成预测值
+            for (let i = 0; i < predictionData[currentTimeRange].labels.length; i++) {
+                const predictedValue = predictFutureValue(xValues, historicalScores, xValues.length + i);
+                futurePredictions.push(predictedValue);
+                
+                // 添加一些随机波动来模拟置信区间
+                const confidenceInterval = 0.5 + Math.random() * 0.3;
+                confidenceUpperBound.push(predictedValue + confidenceInterval);
+                confidenceLowerBound.push(predictedValue - confidenceInterval);
+            }
+            
+            return {
+                labels: predictionData[currentTimeRange].labels,
+                predictions: futurePredictions,
+                confidenceUpperBound,
+                confidenceLowerBound
+            };
+        }
+        
+        // 更新预测图表
+        function updatePredictionChart() {
+            // 获取历史数据
+            const historicalData = mockData[currentTimeRange];
+            
+            // 生成预测数据
+            const { labels, predictions, confidenceUpperBound, confidenceLowerBound } = generatePredictionData();
+            
+            // 更新图表数据
+            predictionChart.data.labels = [...historicalData.labels, ...labels];
+            predictionChart.data.datasets[0].data = [...historicalData.stabilityScore, ...Array(labels.length).fill(null)];
+            predictionChart.data.datasets[1].data = [...Array(historicalData.labels.length).fill(null), ...predictions];
+            predictionChart.data.datasets[2].data = [...Array(historicalData.labels.length).fill(null), ...confidenceUpperBound];
+            predictionChart.data.datasets[3].data = [...Array(historicalData.labels.length).fill(null), ...confidenceLowerBound];
+            
+            predictionChart.update();
+        }
+        
+        // 更新预测结果分析
+        function updatePredictionAnalysis() {
+            const { predictions } = generatePredictionData();
+            const avgPrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+            const minPrediction = Math.min(...predictions);
+            const maxPrediction = Math.max(...predictions);
+            
+            // 根据预测结果生成分析文本
+            let analysisText = '';
+            let statusClass = 'text-green-600';
+            let statusText = '正常范围';
+            
+            if (minPrediction < 90) {
+                statusClass = 'text-red-600';
+                statusText = '警告范围';
+                analysisText = `基于历史数据分析，预测未来24小时内建筑稳定性稳定性将下降至<span class="font-medium ${statusClass}">${statusText}</span>，稳定性评分预计在<span class="font-medium">${minPrediction.toFixed(1)}-${maxPrediction.toFixed(1)}</span>之间。
+                振动强度和位移指标可能会有明显增加趋势，建议增加监控频率并进行现场检查。`;
+            } else if (minPrediction < 93) {
+                statusClass = 'text-yellow-600';
+                statusText = '注意范围';
+                analysisText = `基于历史数据分析，预测未来24小时内建筑稳定性将处于<span class="font-medium ${statusClass}">${statusText}</span>，稳定性评分预计在<span class="font-medium">${minPrediction.toFixed(1)}-${maxPrediction.toFixed(1)}</span>之间。
+                振动强度和位移指标可能会有轻微波动，建议密切关注变化趋势。`;
+            } else {
+                analysisText = `基于历史数据分析，预测未来24小时内建筑稳定性将保持在<span class="font-medium ${statusClass}">${statusText}</span>，稳定性评分预计在<span class="font-medium">${minPrediction.toFixed(1)}-${maxPrediction.toFixed(1)}</span>之间。
+                振动强度和位移指标将保持稳定，无明显异常趋势。建议继续保持当前监控频率。`;
+            }
+            
+            document.getElementById('prediction-result').innerHTML = analysisText;
+        }
+        
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            // 返回按钮
+            document.getElementById('back-btn').addEventListener('click', function() {
+                window.location.href = 'index.html';
+            });
+            
+            // 时间范围下拉菜单
+            document.getElementById('timeRangeDropdown').addEventListener('click', function() {
+                document.getElementById('timeRangeOptions').classList.toggle('hidden');
+            });
+            
+            // 点击其他区域关闭下拉菜单
+            document.addEventListener('click', function(event) {
+                const dropdown = document.getElementById('timeRangeDropdown');
+                const options = document.getElementById('timeRangeOptions');
+                
+                if (!dropdown.contains(event.target) && !options.contains(event.target)) {
+                    options.classList.add('hidden');
+                }
+            });
+            
+            // 时间范围选项
+            document.querySelectorAll('#timeRangeOptions a').forEach(option => {
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    currentTimeRange = this.getAttribute('data-range');
+                    document.getElementById('selectedTimeRange').textContent = this.textContent;
+                    document.getElementById('timeRangeOptions').classList.add('hidden');
+                    
+                    // 更新图表
+                    updateCharts();
+                    
+                    // 更新预测
+                    if (predictionAlgorithmEnabled) {
+                        updatePredictionChart();
+                        updatePredictionAnalysis();
+                    }
+                });
+            });
+            
+            // 刷新按钮
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                // 显示加载动画
+                this.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 刷新中...';
+                this.disabled = true;
+                
+                // 模拟刷新延迟
+                setTimeout(() => {
+                    // 更新图表
+                    updateCharts();
+                    
+                    // 更新预测
+                    if (predictionAlgorithmEnabled) {
+                        updatePredictionChart();
+                        updatePredictionAnalysis();
+                    }
+                    
+                    // 恢复按钮状态
+                    this.innerHTML = '<i class="fa fa-refresh mr-1"></i> 刷新数据';
+                    this.disabled = false;
+                    
+                    // 显示通知
+                    showNotification('数据已刷新');
+                }, 1000);
+            });
+            
+            // 导出按钮
+            document.getElementById('export-btn').addEventListener('click', function() {
+                // 获取图表的数据URL
+                const url = stabilityTrendChart.toBase64Image();
+                
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `稳定性趋势图表_${new Date().toISOString().slice(0, 10)}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // 显示通知
+                showNotification('图表已导出');
+            });
+            
+            // 运行预测按钮
+            document.getElementById('run-prediction').addEventListener('click', function() {
+                // 显示加载动画
+                this.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 分析中...';
+                this.disabled = true;
+                
+                // 模拟AI分析延迟
+                setTimeout(() => {
+                    // 更新预测图表和分析
+                    updatePredictionChart();
+                    updatePredictionAnalysis();
+                    
+                    // 恢复按钮状态
+                    this.innerHTML = '<i class="fa fa-refresh mr-1"></i> 运行预测';
+                    this.disabled = false;
+                    
+                    // 显示通知
+                    showNotification('AI预测分析完成');
+                }, 1500);
+            });
+        }
+        
+        // 更新图表
+        function updateCharts() {
+            // 更新稳定性趋势图表
+            stabilityTrendChart.data.labels = mockData[currentTimeRange].labels;
+            stabilityTrendChart.data.datasets[0].data = mockData[currentTimeRange].stabilityScore;
+            stabilityTrendChart.data.datasets[1].data = mockData[currentTimeRange].vibration;
+            stabilityTrendChart.data.datasets[2].data = mockData[currentTimeRange].displacement;
+            stabilityTrendChart.data.datasets[3].data = mockData[currentTimeRange].tilt;
+            stabilityTrendChart.update();
+            
+            // 更新振动强度图表
+            vibrationChart.data.labels = mockData[currentTimeRange].labels;
+            vibrationChart.data.datasets[0].data = mockData[currentTimeRange].vibration;
+            vibrationChart.update();
+            
+            // 更新位移图表
+            displacementChart.data.labels = mockData[currentTimeRange].labels;
+            displacementChart.data.datasets[0].data = mockData[currentTimeRange].displacement;
+            displacementChart.update();
+            
+            // 更新倾斜角度图表
+            tiltChart.data.labels = mockData[currentTimeRange].labels;
+            tiltChart.data.datasets[0].data = mockData[currentTimeRange].tilt;
+            tiltChart.update();
+            
+            // 更新预测图表
+            if (predictionAlgorithmEnabled) {
+                updatePredictionChart();
+            }
+        }
+        
+        // 显示通知
+        function showNotification(message) {
+            // 创建通知元素
+            const notificationElement = document.createElement('div');
+            notificationElement.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50 flex items-center';
+            notificationElement.innerHTML = `
+                <i class="fa fa-check-circle mr-2"></i>
+                <span>${message}</span>
+                <button class="ml-4 text-white hover:text-gray-200">
+                    <i class="fa fa-times"></i>
+                </button>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(notificationElement);
+            
+            // 添加关闭按钮事件
+            notificationElement.querySelector('button').addEventListener('click', function() {
+                notificationElement.remove();
+            });
+            
+            // 3秒后自动关闭
+            setTimeout(function() {
+                notificationElement.remove();
+            }, 3000);
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>

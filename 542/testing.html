@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>实时监控仪表盘 V27</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    /* 全局样式 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background-color: #F5F7FA;
+      color: #1D2129;
+      min-height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* 顶部导航样式 */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #E5E6EB;
+      margin-bottom: 24px;
+    }
+    .header-left .header-title {
+      font-size: 24px;
+      color: #1D2129;
+      margin: 0;
+    }
+    .header-left .header-desc {
+      font-size: 14px;
+      color: #86909C;
+      margin-top: 4px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #4E5969;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-normal {
+      background: #00B42A;
+    }
+    .last-update {
+      font-size: 14px;
+      color: #86909C;
+    }
+    .refresh-btn {
+      background: #165DFF;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.3s;
+    }
+    .refresh-btn:hover {
+      background: #0E42D2;
+    }
+    .refresh-btn.refreshing i {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* 主内容区样式 */
+    .dashboard-content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* 指标卡片网格 */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    /* 指标卡片样式 */
+    .metric-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      border-left: 4px solid #165DFF;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 14px;
+      color: #86909C;
+      margin: 0;
+    }
+    .card-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .card-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1D2129;
+      margin: 8px 0;
+    }
+    .card-unit {
+      font-size: 16px;
+      color: #4E5969;
+      margin-left: 4px;
+    }
+    .card-trend {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .trend-up {
+      color: #00B42A;
+    }
+    .trend-down {
+      color: #F53F3F;
+    }
+    .card-gauge {
+      width: 100%;
+      height: 8px;
+    }
+    .gauge-track {
+      width: 100%;
+      height: 100%;
+      background: #F2F3F5;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .gauge-progress {
+      height: 100%;
+      border-radius: 4px;
+    }
+
+    /* 图表区域网格 */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    .chart-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+    }
+    .large-chart {
+      height: 350px;
+    }
+    .small-chart {
+      height: 300px;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .chart-title {
+      font-size: 16px;
+      color: #1D2129;
+      margin: 0;
+    }
+    .time-range-control {
+      display: flex;
+      gap: 8px;
+    }
+    .range-btn {
+      padding: 4px 12px;
+      border: 1px solid #E5E6EB;
+      border-radius: 4px;
+      background: transparent;
+      font-size: 12px;
+      color: #86909C;
+      cursor: pointer;
+    }
+    .range-btn.active {
+      background: #165DFF;
+      color: #fff;
+      border-color: #165DFF;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #86909C;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .total-devices, .chart-desc {
+      font-size: 12px;
+      color: #86909C;
+    }
+    .chart-container {
+      width: 100%;
+      height: calc(100% - 30px);
+    }
+
+    /* 设备状态环形图补充样式 */
+    .status-summary {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding-top: 10px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #4E5969;
+    }
+
+    /* 数据日志样式 */
+    .log-container {
+      width: 100%;
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .log-title {
+      font-size: 16px;
+      color: #1D2129;
+      margin: 0;
+    }
+    .export-btn {
+      background: transparent;
+      border: 1px solid #165DFF;
+      color: #165DFF;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .log-table-wrapper {
+      overflow-x: auto;
+    }
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .log-table th {
+      text-align: left;
+      padding: 12px 10px;
+      color: #86909C;
+      font-weight: 500;
+      border-bottom: 1px solid #F2F3F5;
+    }
+    .log-row td {
+      padding: 12px 10px;
+      color: #4E5969;
+      border-bottom: 1px solid #F2F3F5;
+    }
+    .log-row:hover {
+      background: #F9FAFB;
+    }
+    .status-tag {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+    .status-normal {
+      background: rgba(0, 180, 42, 0.1);
+      color: #00B42A;
+    }
+    .status-warning {
+      background: rgba(255, 125, 0, 0.1);
+      color: #FF7D00;
+    }
+
+    /* 响应式适配 */
+    @media (max-width: 1024px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+      .header-right {
+        gap: 16px;
+      }
+    }
+    @media (max-width: 768px) {
+      .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .header-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 480px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+      .time-range-control {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <!-- 顶部导航 -->
+    <header class="dashboard-header">
+      <div class="header-left">
+        <h1 class="header-title">实时监控仪表盘 V27</h1>
+        <p class="header-desc">多维度数据实时监测与分析平台</p>
+      </div>
+      <div class="header-right">
+        <!-- 系统状态 -->
+        <div class="system-status">
+          <span class="status-dot status-normal"></span>
+          <span class="status-text">系统正常运行中</span>
+        </div>
+        <!-- 最后更新时间 -->
+        <div class="last-update">
+          最后更新: {{ lastUpdateTime }}
+        </div>
+        <!-- 手动刷新按钮 -->
+        <button 
+          class="refresh-btn" 
+          @click="handleManualRefresh"
+          :class="{ refreshing: isRefreshing }"
+        >
+          <i class="fa fa-refresh"></i> 刷新
+        </button>
+      </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="dashboard-content">
+      <!-- 1. 关键指标卡片区域 -->
+      <div class="metrics-grid">
+        <!-- 温度指标 -->
+        <div class="metric-card" :style="{ borderLeftColor: '#165DFF' }">
+          <div class="card-header">
+            <p class="card-title">当前温度</p>
+            <div class="card-icon" style="background-color: rgba(22, 93, 255, 0.2); color: #165DFF">
+              <i class="fa fa-thermometer-half"></i>
+            </div>
+          </div>
+          <div class="card-value">
+            {{ metrics.temp.value }}<span class="card-unit">°C</span>
+          </div>
+          <div class="card-trend" :class="metrics.temp.trend >= 0 ? 'trend-up' : 'trend-down'">
+            <i :class="['fa', metrics.temp.trend >= 0 ? 'fa-arrow-up' : 'fa-arrow-down']"></i>
+            <span>{{ Math.abs(metrics.temp.trend) }}°C 较昨日</span>
+          </div>
+          <div class="card-gauge">
+            <div class="gauge-track">
+              <div 
+                class="gauge-progress" 
+                :style="{ width: `${metrics.temp.gaugePercent}%`, backgroundColor: '#165DFF', transition: 'width 0.8s ease' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 压力指标 -->
+        <div class="metric-card" :style="{ borderLeftColor: '#00B42A' }">
+          <div class="card-header">
+            <p class="card-title">当前压力</p>
+            <div class="card-icon" style="background-color: rgba(0, 180, 42, 0.2); color: #00B42A">
+              <i class="fa fa-dashboard"></i>
+            </div>
+          </div>
+          <div class="card-value">
+            {{ metrics.pressure.value }}<span class="card-unit">G</span>
+          </div>
+          <div class="card-trend" :class="metrics.pressure.trend >= 0 ? 'trend-up' : 'trend-down'">
+            <i :class="['fa', metrics.pressure.trend >= 0 ? 'fa-arrow-up' : 'fa-arrow-down']"></i>
+            <span>{{ Math.abs(metrics.pressure.trend) }}G 较昨日</span>
+          </div>
+          <div class="card-gauge">
+            <div class="gauge-track">
+              <div 
+                class="gauge-progress" 
+                :style="{ width: `${metrics.pressure.gaugePercent}%`, backgroundColor: '#00B42A', transition: 'width 0.8s ease' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 震动指标 -->
+        <div class="metric-card" :style="{ borderLeftColor: '#FF7D00' }">
+          <div class="card-header">
+            <p class="card-title">震动强度</p>
+            <div class="card-icon" style="background-color: rgba(255, 125, 0, 0.2); color: #FF7D00">
+              <i class="fa fa-random"></i>
+            </div>
+          </div>
+          <div class="card-value">
+            {{ metrics.vibration.value }}<span class="card-unit">Hz</span>
+          </div>
+          <div class="card-trend" :class="metrics.vibration.trend >= 0 ? 'trend-up' : 'trend-down'">
+            <i :class="['fa', metrics.vibration.trend >= 0 ? 'fa-arrow-up' : 'fa-arrow-down']"></i>
+            <span>{{ Math.abs(metrics.vibration.trend) }}Hz 较昨日</span>
+          </div>
+          <div class="card-gauge">
+            <div class="gauge-track">
+              <div 
+                class="gauge-progress" 
+                :style="{ width: `${metrics.vibration.gaugePercent}%`, backgroundColor: '#FF7D00', transition: 'width 0.8s ease' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 在线率指标 -->
+        <div class="metric-card" :style="{ borderLeftColor: '#722ED1' }">
+          <div class="card-header">
+            <p class="card-title">设备在线率</p>
+            <div class="card-icon" style="background-color: rgba(114, 46, 209, 0.2); color: #722ED1">
+              <i class="fa fa-signal"></i>
+            </div>
+          </div>
+          <div class="card-value">
+            {{ metrics.onlineRate.value }}<span class="card-unit">%</span>
+          </div>
+          <div class="card-trend" :class="metrics.onlineRate.trend >= 0 ? 'trend-up' : 'trend-down'">
+            <i :class="['fa', metrics.onlineRate.trend >= 0 ? 'fa-arrow-up' : 'fa-arrow-down']"></i>
+            <span>{{ Math.abs(metrics.onlineRate.trend) }}% 较昨日</span>
+          </div>
+          <div class="card-gauge">
+            <div class="gauge-track">
+              <div 
+                class="gauge-progress" 
+                :style="{ width: `${metrics.onlineRate.value}%`, backgroundColor: '#722ED1', transition: 'width 0.8s ease' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 图表区域 -->
+      <div class="charts-grid">
+        <!-- 温度趋势图 -->
+        <div class="chart-card large-chart">
+          <div class="chart-header">
+            <h3 class="chart-title">温度实时趋势</h3>
+            <div class="time-range-control">
+              <button 
+                v-for="(range, key) in timeRanges" 
+                :key="key"
+                class="range-btn"
+                :class="{ active: currentRange === key }"
+                @click="handleTimeRangeChange(key)"
+              >
+                {{ range.label }}
+              </button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="temperatureChart"></canvas>
+          </div>
+        </div>
+
+        <!-- 多指标对比图 -->
+        <div class="chart-card large-chart">
+          <div class="chart-header">
+            <h3 class="chart-title">多指标对比</h3>
+            <div class="chart-legend">
+              <span class="legend-item"><i class="dot" style="background: #165DFF;"></i>温度</span>
+              <span class="legend-item"><i class="dot" style="background: #00B42A;"></i>压力</span>
+              <span class="legend-item"><i class="dot" style="background: #FF7D00;"></i>震动</span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="multiMetricChart"></canvas>
+          </div>
+        </div>
+
+        <!-- 设备状态环形图 -->
+        <div class="chart-card small-chart">
+          <div class="chart-header">
+            <h3 class="chart-title">设备运行状态</h3>
+            <span class="total-devices">总计: {{ deviceTotal }} 台</span>
+          </div>
+          <div class="chart-container" style="position: relative;">
+            <canvas id="deviceStatusChart"></canvas>
+            <div class="status-summary">
+              <span class="status-item" v-for="(label, index) in deviceStatusData.labels" :key="index">
+                <span class="status-dot" :style="{ backgroundColor: deviceStatusData.datasets[0].backgroundColor[index] }"></span>
+                <span class="status-text">{{ label }}: {{ deviceStatusData.datasets[0].data[index] }}台</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设备负载柱状图 -->
+        <div class="chart-card small-chart">
+          <div class="chart-header">
+            <h3 class="chart-title">设备负载分布</h3>
+            <span class="chart-desc">近10分钟平均</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="deviceLoadChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 数据日志区域 -->
+      <div class="log-container">
+        <div class="log-header">
+          <h3 class="log-title">实时数据日志</h3>
+          <button class="export-btn" @click="handleExport">
+            <i class="fa fa-download"></i> 导出数据
+          </button>
+        </div>
+        <div class="log-table-wrapper">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>温度(°C)</th>
+                <th>压力(G)</th>
+                <th>震动(Hz)</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(log, index) in logs" :key="index" class="log-row">
+                <td>{{ log.time }}</td>
+                <td>{{ log.temperature }}</td>
+                <td>{{ log.pressure }}</td>
+                <td>{{ log.vibration }}</td>
+                <td>
+                  <span 
+                    class="status-tag" 
+                    :class="log.status === '正常' ? 'status-normal' : 'status-warning'"
+                  >
+                    {{ log.status }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // 数据工具函数
+    const dataUtils = {
+      // 生成指定范围的随机数
+      getRandomNum(min, max, decimal = 1) {
+        const num = Math.random() * (max - min) + min;
+        return Number(num.toFixed(decimal));
+      },
+      
+      // 生成时间标签（格式：MM:SS 或 HH:MM:SS）
+      getTimeLabel(showHour = false) {
+        const now = new Date();
+        const hour = now.getHours().toString().padStart(2, '0');
+        const minute = now.getMinutes().toString().padStart(2, '0');
+        const second = now.getSeconds().toString().padStart(2, '0');
+        return showHour ? `${hour}:${minute}:${second}` : `${minute}:${second}`;
+      },
+      
+      // 生成初始数据集
+      generateInitData(count, min, max, decimal = 1) {
+        return Array(count).fill(0).map(() => this.getRandomNum(min, max, decimal));
+      },
+      
+      // 生成初始时间标签
+      generateInitTimeLabels(count, interval = 30) {
+        const labels = [];
+        const now = new Date();
+        for (let i = count - 1; i >= 0; i--) {
+          const time = new Date(now - i * interval * 1000);
+          labels.push(`${time.getMinutes().toString().padStart(2, '0')}:${time.getSeconds().toString().padStart(2, '0')}`);
+        }
+        return labels;
+      }
+    };
+
+    // Vue实例
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          // 系统状态
+          lastUpdateTime: dataUtils.getTimeLabel(true),
+          isRefreshing: false,
+          
+          // 时间范围配置
+          currentRange: 'hour',
+          timeRanges: {
+            hour: { label: '1小时', points: 20, interval: 30 },
+            day: { label: '1天', points: 48, interval: 30 },
+            week: { label: '1周', points: 168, interval: 60 }
+          },
+          
+          // 核心指标数据
+          metrics: {
+            temp: { value: 28.5, trend: 0.2, min: 20, max: 40, gaugePercent: 46.25 },
+            pressure: { value: 3.37, trend: -0.12, min: 0, max: 10, gaugePercent: 33.7 },
+            vibration: { value: 156.8, trend: 2.4, min: 100, max: 200, gaugePercent: 56.8 },
+            onlineRate: { value: 94.5, trend: 1.2 }
+          },
+          
+          // 图表实例
+          charts: {},
+          
+          // 图表数据
+          tempChartData: {},
+          multiChartData: {},
+          deviceStatusData: {
+            labels: ['正常', '预警', '异常'],
+            datasets: [{ data: [16, 3, 1], backgroundColor: ['#00B42A', '#FF7D00', '#F53F3F'] }]
+          },
+          deviceLoadData: {
+            labels: ['设备1', '设备2', '设备3', '设备4', '设备5'],
+            datasets: [{ label: '负载率(%)', data: [65, 78, 52, 91, 43], backgroundColor: '#722ED1' }]
+          },
+          
+          // 设备总数
+          deviceTotal: 20,
+          
+          // 日志数据
+          logs: []
+        };
+      },
+      mounted() {
+        // 1. 初始化图表
+        this.initCharts();
+        
+        // 2. 初始化日志
+        this.initLogs();
+        
+        // 3. 启动定时器
+        this.startTimers();
+      },
+      beforeDestroy() {
+        // 清除所有定时器
+        if (this.metricTimer) clearInterval(this.metricTimer);
+        if (this.statusTimer) clearInterval(this.statusTimer);
+        if (this.loadTimer) clearInterval(this.loadTimer);
+        if (this.timeTimer) clearInterval(this.timeTimer);
+        
+        // 销毁图表
+        Object.values(this.charts).forEach(chart => chart.destroy());
+      },
+      methods: {
+        // 初始化图表
+        initCharts() {
+          const { points, interval } = this.timeRanges[this.currentRange];
+          const labels = dataUtils.generateInitTimeLabels(points, interval);
+          
+          // 温度趋势图
+          this.tempChartData = {
+            labels,
+            datasets: [{
+              label: '温度 (°C)',
+              data: dataUtils.generateInitData(points, 25, 30),
+              borderColor: '#165DFF',
+              backgroundColor: 'rgba(22, 93, 255, 0.1)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 0,
+              pointHoverRadius: 4
+            }]
+          };
+          
+          this.charts.temp = new Chart(document.getElementById('temperatureChart'), {
+            type: 'line',
+            data: this.tempChartData,
+            options: this.getLineChartOptions('温度 (°C)')
+          });
+          
+          // 多指标对比图
+          const multiLabels = dataUtils.generateInitTimeLabels(20, 30);
+          this.multiChartData = {
+            labels: multiLabels,
+            datasets: [
+              {
+                label: '温度 (°C)',
+                data: dataUtils.generateInitData(20, 25, 30),
+                borderColor: '#165DFF',
+                backgroundColor: 'transparent',
+                tension: 0.4
+              },
+              {
+                label: '压力 (G)',
+                data: dataUtils.generateInitData(20, 3, 3.8, 2),
+                borderColor: '#00B42A',
+                backgroundColor: 'transparent',
+                tension: 0.4
+              },
+              {
+                label: '震动 (Hz)',
+                data: dataUtils.generateInitData(20, 150, 160),
+                borderColor: '#FF7D00',
+                backgroundColor: 'transparent',
+                tension: 0.4
+              }
+            ]
+          };
+          
+          this.charts.multi = new Chart(document.getElementById('multiMetricChart'), {
+            type: 'line',
+            data: this.multiChartData,
+            options: this.getMultiLineChartOptions()
+          });
+          
+          // 设备状态环形图
+          this.charts.status = new Chart(document.getElementById('deviceStatusChart'), {
+            type: 'doughnut',
+            data: this.deviceStatusData,
+            options: this.getDonutChartOptions()
+          });
+          
+          // 设备负载柱状图
+          this.charts.load = new Chart(document.getElementById('deviceLoadChart'), {
+            type: 'bar',
+            data: this.deviceLoadData,
+            options: this.getBarChartOptions()
+          });
+        },
+        
+        // 初始化日志
+        initLogs() {
+          this.logs = Array(5).fill(0).map(() => {
+            const temp = dataUtils.getRandomNum(27, 29, 1);
+            return {
+              time: dataUtils.getTimeLabel(true),
+              temperature: `${temp}°C`,
+              pressure: `${dataUtils.getRandomNum(3.2, 3.5, 2)}G`,
+              vibration: `${dataUtils.getRandomNum(155, 158, 1)}Hz`,
+              status: temp > 28.5 ? '高温预警' : '正常'
+            };
+          });
+        },
+        
+        // 启动定时器
+        startTimers() {
+          // 核心指标更新（3秒一次）
+          this.metricTimer = setInterval(() => {
+            this.updateMetrics();
+            this.updateCharts();
+            this.addNewLog();
+          }, 3000);
+          
+          // 设备状态更新（30秒一次）
+          this.statusTimer = setInterval(() => {
+            this.updateDeviceStatus();
+          }, 30000);
+          
+          // 设备负载更新（10秒一次）
+          this.loadTimer = setInterval(() => {
+            this.updateDeviceLoad();
+          }, 10000);
+          
+          // 时间更新（1秒一次）
+          this.timeTimer = setInterval(() => {
+            this.lastUpdateTime = dataUtils.getTimeLabel(true);
+          }, 1000);
+        },
+        
+        // 更新核心指标
+        updateMetrics() {
+          // 温度更新（±0.3°C）
+          const newTemp = dataUtils.getRandomNum(
+            Math.max(this.metrics.temp.min, this.metrics.temp.value - 0.3),
+            Math.min(this.metrics.temp.max, this.metrics.temp.value + 0.3),
+            1
+          );
+          this.metrics.temp.value = newTemp;
+          this.metrics.temp.gaugePercent = ((newTemp - this.metrics.temp.min) / (this.metrics.temp.max - this.metrics.temp.min)) * 100;
+          this.metrics.temp.trend = dataUtils.getRandomNum(-0.5, 0.5, 1);
+
+          // 压力更新（±0.1G）
+          const newPressure = dataUtils.getRandomNum(
+            Math.max(this.metrics.pressure.min, this.metrics.pressure.value - 0.1),
+            Math.min(this.metrics.pressure.max, this.metrics.pressure.value + 0.1),
+            2
+          );
+          this.metrics.pressure.value = newPressure;
+          this.metrics.pressure.gaugePercent = (newPressure / this.metrics.pressure.max) * 100;
+          this.metrics.pressure.trend = dataUtils.getRandomNum(-0.2, 0.2, 2);
+
+          // 震动更新（±2Hz）
+          const newVibration = dataUtils.getRandomNum(
+            Math.max(this.metrics.vibration.min, this.metrics.vibration.value - 2),
+            Math.min(this.metrics.vibration.max, this.metrics.vibration.value + 2),
+            1
+          );
+          this.metrics.vibration.value = newVibration;
+          this.metrics.vibration.gaugePercent = ((newVibration - this.metrics.vibration.min) / (this.metrics.vibration.max - this.metrics.vibration.min)) * 100;
+          this.metrics.vibration.trend = dataUtils.getRandomNum(-1, 1, 1);
+
+          // 在线率更新（±0.5%）
+          this.metrics.onlineRate.value = dataUtils.getRandomNum(
+            Math.max(90, this.metrics.onlineRate.value - 0.5),
+            Math.min(99, this.metrics.onlineRate.value + 0.5),
+            1
+          );
+        },
+        
+        // 更新图表数据
+        updateCharts() {
+          const newTimeLabel = dataUtils.getTimeLabel();
+          const maxTempPoints = this.timeRanges[this.currentRange].points;
+          
+          // 更新温度图表
+          this.tempChartData.labels.push(newTimeLabel);
+          this.tempChartData.datasets[0].data.push(this.metrics.temp.value);
+          
+          if (this.tempChartData.labels.length > maxTempPoints) {
+            this.tempChartData.labels.shift();
+            this.tempChartData.datasets[0].data.shift();
+          }
+          this.charts.temp.update();
+          
+          // 更新多指标图表
+          this.multiChartData.labels.push(newTimeLabel);
+          this.multiChartData.datasets[0].data.push(this.metrics.temp.value);
+          this.multiChartData.datasets[1].data.push(this.metrics.pressure.value);
+          this.multiChartData.datasets[2].data.push(this.metrics.vibration.value);
+          
+          if (this.multiChartData.labels.length > 20) {
+            this.multiChartData.labels.shift();
+            this.multiChartData.datasets.forEach(ds => ds.data.shift());
+          }
+          this.charts.multi.update();
+        },
+        
+        // 添加新日志
+        addNewLog() {
+          const newLog = {
+            time: dataUtils.getTimeLabel(true),
+            temperature: `${this.metrics.temp.value}°C`,
+            pressure: `${this.metrics.pressure.value}G`,
+            vibration: `${this.metrics.vibration.value}Hz`,
+            status: this.metrics.temp.value > 29 ? '高温预警' : '正常'
+          };
+          
+          this.logs.unshift(newLog);
+          if (this.logs.length > 10) {
+            this.logs.pop();
+          }
+        },
+        
+        // 更新设备状态
+        updateDeviceStatus() {
+          const changeIndex = Math.floor(Math.random() * 2); // 只在正常/预警间波动
+          
+          if (this.deviceStatusData.datasets[0].data[changeIndex] > 0) {
+            this.deviceStatusData.datasets[0].data[changeIndex]--;
+            this.deviceStatusData.datasets[0].data[changeIndex + 1]++;
+            this.charts.status.update();
+          }
+        },
+        
+        // 更新设备负载
+        updateDeviceLoad() {
+          const newData = this.deviceLoadData.datasets[0].data.map(value => {
+            return dataUtils.getRandomNum(Math.max(0, value - 5), Math.min(100, value + 5), 0);
+          });
+          
+          this.deviceLoadData.datasets[0].data = newData;
+          this.charts.load.update();
+        },
+        
+        // 时间范围切换
+        handleTimeRangeChange(rangeKey) {
+          this.currentRange = rangeKey;
+          // 销毁旧图表
+          this.charts.temp.destroy();
+          // 重新初始化温度图表
+          const { points, interval } = this.timeRanges[rangeKey];
+          this.tempChartData.labels = dataUtils.generateInitTimeLabels(points, interval);
+          this.tempChartData.datasets[0].data = dataUtils.generateInitData(points, 25, 30);
+          this.charts.temp = new Chart(document.getElementById('temperatureChart'), {
+            type: 'line',
+            data: this.tempChartData,
+            options: this.getLineChartOptions('温度 (°C)')
+          });
+        },
+        
+        // 手动刷新
+        handleManualRefresh() {
+          this.isRefreshing = true;
+          this.updateMetrics();
+          this.updateCharts();
+          this.addNewLog();
+          this.updateDeviceStatus();
+          this.updateDeviceLoad();
+          
+          setTimeout(() => {
+            this.isRefreshing = false;
+          }, 1000);
+        },
+        
+        // 导出日志
+        handleExport() {
+          alert('数据日志已导出（模拟操作）');
+        },
+        
+        // 图表配置 - 折线图
+        getLineChartOptions(yLabel) {
+          return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                padding: 10,
+                cornerRadius: 4
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: '#86909C' } },
+              y: {
+                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                ticks: { color: '#86909C' },
+                title: { display: true, text: yLabel, color: '#4E5969' }
+              }
+            },
+            animation: { duration: 500 }
+          };
+        },
+        
+        // 图表配置 - 多线图
+        getMultiLineChartOptions() {
+          return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                padding: 10,
+                cornerRadius: 4
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: '#86909C' } },
+              y: {
+                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                ticks: { color: '#86909C' }
+              }
+            },
+            animation: { duration: 500 }
+          };
+        },
+        
+        // 图表配置 - 环形图
+        getDonutChartOptions() {
+          return {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}台` }
+              }
+            },
+            animation: { animateRotate: true, duration: 1000 }
+          };
+        },
+        
+        // 图表配置 - 柱状图
+        getBarChartOptions() {
+          return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: { label: (ctx) => `${ctx.raw}%` }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: '#86909C' } },
+              y: {
+                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                ticks: { color: '#86909C', callback: (v) => `${v}%` },
+                min: 0, max: 100
+              }
+            },
+            animation: { duration: 800 }
+          };
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>压力与震动强度实时趋势图</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto p-4">
+        <h2 class="text-xl font-bold mb-4">压力与震动强度实时监测</h2>
+        <div class="chart-container" id="trendChart"></div>
+        <div class="flex gap-4 mt-4">
+            <button id="10s" class="px-4 py-2 bg-blue-500 text-white rounded">最近10秒</button>
+            <button id="1min" class="px-4 py-2 bg-gray-300 rounded">最近1分钟</button>
+            <button id="10min" class="px-4 py-2 bg-gray-300 rounded">最近10分钟</button>
+        </div>
+    </div>
+
+    <script>
+        // 初始化图表
+        const chartDom = document.getElementById('trendChart');
+        const myChart = echarts.init(chartDom);
+        let timeWindow = 10; // 默认10秒
+        let timeData = [];
+        let pressureData = [];
+        let vibrationData = [];
+
+        // 图表配置
+        const option = {
+            title: {
+                text: '实时趋势曲线'
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross'
+                }
+            },
+            legend: {
+                data: ['压力值', '震动强度']
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: timeData
+            },
+            yAxis: [
+                {
+                    type: 'value',
+                    name: '压力值',
+                    nameLocation: 'middle',
+                    nameGap: 30,
+                    min: 0,
+                    max: 100,
+                    axisLabel: {
+                        formatter: '{value} kPa'
+                    }
+                },
+                {
+                    type: 'value',
+                    name: '震动强度',
+                    nameLocation: 'middle',
+                    nameGap: 30,
+                    min: 0,
+                    max: 20,
+                    axisLabel: {
+                        formatter: '{value} m/s²'
+                    },
+                    position: 'right',
+                    offset: 0,
+                    splitLine: {
+                        show: false
+                    }
+                }
+            ],
+            series: [
+                {
+                    name: '压力值',
+                    type: 'line',
+                    data: pressureData,
+                    symbol: 'none',
+                    smooth: true,
+                    lineStyle: {
+                        width: 2,
+                        color: '#1890ff'
+                    }
+                },
+                {
+                    name: '震动强度',
+                    type: 'line',
+                    data: vibrationData,
+                    symbol: 'none',
+                    smooth: true,
+                    yAxisIndex: 1,
+                    lineStyle: {
+                        width: 2,
+                        color: '#fa8c16'
+                    }
+                }
+            ]
+        };
+
+        myChart.setOption(option);
+
+        // 模拟实时数据更新
+        function updateData() {
+            const now = new Date();
+            const timeStr = `${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            
+            // 生成随机模拟数据
+            const pressure = Math.random() * 80 + 10; // 10-90 kPa
+            const vibration = Math.random() * 15 + 1; // 1-16 m/s²
+            
+            // 添加新数据
+            timeData.push(timeStr);
+            pressureData.push(pressure.toFixed(1));
+            vibrationData.push(vibration.toFixed(1));
+            
+            // 保持数据点数量与时间窗口匹配
+            const maxPoints = timeWindow === 10 ? 10 : (timeWindow === 60 ? 60 : 600);
+            if (timeData.length > maxPoints) {
+                timeData.shift();
+                pressureData.shift();
+                vibrationData.shift();
+            }
+            
+            // 更新图表
+            myChart.setOption({
+                xAxis: {
+                    data: timeData
+                },
+                series: [
+                    { data: pressureData },
+                    { data: vibrationData }
+                ]
+            });
+        }
+
+        // 定时更新数据
+        let updateInterval = setInterval(updateData, 1000);
+
+        // 时间窗口切换
+        document.getElementById('10s').addEventListener('click', () => {
+            timeWindow = 10;
+            resetChart();
+            setActiveButton('10s');
+        });
+
+        document.getElementById('1min').addEventListener('click', () => {
+            timeWindow = 60;
+            resetChart();
+            setActiveButton('1min');
+        });
+
+        document.getElementById('10min').addEventListener('click', () => {
+            timeWindow = 600;
+            resetChart();
+            setActiveButton('10min');
+        });
+
+        function resetChart() {
+            clearInterval(updateInterval);
+            timeData = [];
+            pressureData = [];
+            vibrationData = [];
+            updateInterval = setInterval(updateData, timeWindow === 600 ? 1000 : 1000);
+        }
+
+        function setActiveButton(id) {
+            ['10s', '1min', '10min'].forEach(btnId => {
+                const btn = document.getElementById(btnId);
+                if (btnId === id) {
+                    btn.className = 'px-4 py-2 bg-blue-500 text-white rounded';
+                } else {
+                    btn.className = 'px-4 py-2 bg-gray-300 rounded';
+                }
+            });
+        }
+
+        // 响应窗口大小变化
+        window.addEventListener('resize', () => {
+            myChart.resize();
+        });
+    </script>
+</body>
+</html>
